@@ -20,6 +20,9 @@ USER 1001
 # User home from base image
 WORKDIR /home/kogito/kogito-sw-base
 
+
+ARG MY_PROPERTY
+
 # Copy from build context to skeleton project
 COPY * ./src/main/resources
 

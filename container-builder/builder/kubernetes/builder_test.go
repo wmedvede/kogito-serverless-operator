@@ -56,7 +56,17 @@ func TestNewBuild(t *testing.T) {
 		WithClient(c).
 		AddResource("Dockerfile", dockerFile).
 		AddResource("greetings.sw.json", workflowDefinition).
-		Scheduler().Schedule()
+		Scheduler().
+		WithBuildArgs([]v1.EnvVar{
+			{
+				Name:  "QUARKUS_EXTENSIONS",
+				Value: "extension1,extension2",
+			},
+			{
+				Name:  "MY_PROPERTY",
+				Value: "my_property_value",
+			}}).
+		Schedule()
 
 	assert.NoError(t, err)
 	assert.NotNil(t, build)

@@ -19,7 +19,7 @@ USER 1001
 
 ARG QUARKUS_PACKAGE_TYPE="jar"
 ARG SCRIPT_DEBUG="false"
-
+ARG QUARKUS_DATASOURCE_DB_KIND
  # Copy from build context to skeleton resources project
 COPY * ./resources/
 

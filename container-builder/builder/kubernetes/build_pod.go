@@ -16,6 +16,7 @@ package kubernetes
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path"
 	"strings"
@@ -40,6 +41,7 @@ type registrySecret struct {
 }
 
 func newBuildPod(ctx context.Context, c client.Client, build *api.ContainerBuild) (*corev1.Pod, error) {
+	fmt.Println("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX 1")
 	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.String(),

@@ -75,7 +75,7 @@ func main() {
 		WithClient(cli).
 		AddResource("Dockerfile", dockerFile).AddResource("greetings.sw.json", source).
 		Scheduler().
-		WithAdditionalArgs([]string{"--build-arg=QUARKUS_PACKAGE_TYPE=mutable-jar", "--build-arg=QUARKUS_LAUNCH_DEVMODE=true", "--build-arg=SCRIPT_DEBUG=false"}).
+		WithAdditionalArgs([]string{"--build-arg=QUARKUS_PACKAGE_TYPE=mutable-jar", "--build-arg=QUARKUS_LAUNCH_DEVMODE=true", "--build-arg=SCRIPT_DEBUG=false", "--build-arg=QUARKUS_DATASOURCE_DB_KIND=MY_DATASOURCE"}).
 		WithResourceRequirements(v1.ResourceRequirements{
 			Limits: v1.ResourceList{
 				v1.ResourceCPU:    cpuQty,
