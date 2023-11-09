@@ -16,6 +16,7 @@ package prod
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
@@ -137,6 +138,9 @@ func (h *deployWithBuildWorkflowState) Do(ctx context.Context, workflow *operato
 	// Guard to avoid errors while getting a new builder manager.
 	// Maybe we can do typed errors in the buildManager and
 	// have something like sonataerr.IsPlatformNotFound(err) instead.
+
+	fmt.Println(fmt.Sprintf("deployWithBuildWorkflowState.Do for workflow: %s", workflow.Name))
+
 	_, err := platform.GetActivePlatform(ctx, h.C, workflow.Namespace)
 	if err != nil {
 		workflow.Status.Manager().MarkFalse(api.RunningConditionType, api.WaitingForPlatformReason,

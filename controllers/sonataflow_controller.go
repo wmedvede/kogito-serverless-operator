@@ -66,6 +66,8 @@ type SonataFlowReconciler struct {
 func (r *SonataFlowReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
 	// Make sure the operator is allowed to act on namespace
+	fmt.Println(fmt.Sprintf("XXXXX SonataflowRecondiler.Reconcile starting for workflow: %s", req.NamespacedName.String()))
+
 	if ok, err := platform.IsOperatorAllowedOnNamespace(ctx, r.Client, req.Namespace); err != nil {
 		return reconcile.Result{}, err
 	} else if !ok {

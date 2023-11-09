@@ -15,6 +15,7 @@
 package common
 
 import (
+	"context"
 	"testing"
 
 	"github.com/magiconair/properties"
@@ -38,7 +39,8 @@ func Test_ensureWorkflowPropertiesConfigMapMutator(t *testing.T) {
 	cm.SetResourceVersion("1")
 	reflectCm := cm.(*corev1.ConfigMap)
 
-	visitor := WorkflowPropertiesMutateVisitor(workflow)
+	//TODO revistar
+	visitor := WorkflowPropertiesMutateVisitor(context.TODO(), nil, workflow)
 	mutateFn := visitor(cm)
 
 	assert.NoError(t, mutateFn())
@@ -71,7 +73,8 @@ func Test_ensureWorkflowPropertiesConfigMapMutator_DollarReplacement(t *testing.
 			workflowproj.ApplicationPropertiesFileName: "mp.messaging.outgoing.kogito_outgoing_stream.url=${kubernetes:services.v1/event-listener}",
 		},
 	}
-	mutateVisitorFn := WorkflowPropertiesMutateVisitor(workflow)
+	//TODO ver esto
+	mutateVisitorFn := WorkflowPropertiesMutateVisitor(context.TODO(), nil, workflow)
 
 	err := mutateVisitorFn(existingCM)()
 	assert.NoError(t, err)

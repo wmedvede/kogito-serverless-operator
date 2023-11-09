@@ -16,6 +16,7 @@ package prod
 
 import (
 	"context"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -46,7 +47,12 @@ func (d *deploymentHandler) handle(ctx context.Context, workflow *operatorapi.So
 }
 
 func (d *deploymentHandler) handleWithImage(ctx context.Context, workflow *operatorapi.SonataFlow, image string) (reconcile.Result, []client.Object, error) {
-	propsCM, _, err := d.ensurers.propertiesConfigMap.Ensure(ctx, workflow, common.WorkflowPropertiesMutateVisitor(workflow))
+
+	//Image has been generated, now we need to create the corresponding Deployment and Service.
+	fmt.Println(fmt.Sprintf("XXX deploymentHandler.handleWithImage, workflow: %s, image: %s", workflow.Name, image))
+	//Create the ConfigMap for the workflow with the default properties.
+	propsCM, _, err := d.ensurers.propertiesConfigMap.Ensure(ctx, workflow, common.WorkflowPropertiesMutateVisitor(ctx, d.StateSupport.Catalog, workflow))
+
 	if err != nil {
 		workflow.Status.Manager().MarkFalse(api.RunningConditionType, api.ExternalResourcesNotFoundReason, "Unable to retrieve the properties config map")
 		_, err = d.PerformStatusUpdate(ctx, workflow)

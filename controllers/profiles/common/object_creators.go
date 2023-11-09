@@ -15,6 +15,8 @@
 package common
 
 import (
+	"fmt"
+
 	"github.com/imdario/mergo"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -201,5 +203,9 @@ func OpenShiftRouteCreator(workflow *operatorapi.SonataFlow) (client.Object, err
 
 // WorkflowPropsConfigMapCreator creates a ConfigMap to hold the external application properties
 func WorkflowPropsConfigMapCreator(workflow *operatorapi.SonataFlow) (client.Object, error) {
+	// this creator is executed by the deploymentHandler -> propertiesConfigMap common.ObjectEnsurer to ensure
+	// the config map with the properties workflow default properties is created at the moment we are preparing
+	// the Deployment.
+	fmt.Println("XXX WorkflowPropsConfigMapCreator creating the ConfigMap for workflow: " + workflow.Name)
 	return workflowproj.CreateNewAppPropsConfigMap(workflow, ImmutableApplicationProperties(workflow)), nil
 }

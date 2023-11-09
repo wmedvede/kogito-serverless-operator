@@ -15,6 +15,10 @@
 package common
 
 import (
+	"context"
+	"fmt"
+
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/discovery"
 	"github.com/imdario/mergo"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -94,16 +98,22 @@ func ServiceMutateVisitor(workflow *operatorapi.SonataFlow) MutateVisitor {
 	}
 }
 
-func WorkflowPropertiesMutateVisitor(workflow *operatorapi.SonataFlow) MutateVisitor {
+func WorkflowPropertiesMutateVisitor(ctx context.Context, catalog discovery.ServiceCatalog, workflow *operatorapi.SonataFlow) MutateVisitor {
 	return func(object client.Object) controllerutil.MutateFn {
 		return func() error {
+			fmt.Println(fmt.Sprintf("XXX WorkflowPropertiesMutateVisitor for workflow: %s", workflow.Name))
+
 			if kubeutil.IsObjectNew(object) {
 				return nil
 			}
+
 			cm := object.(*corev1.ConfigMap)
+
 			cm.Labels = workflow.GetLabels()
+
 			_, hasKey := cm.Data[workflowproj.ApplicationPropertiesFileName]
 			if !hasKey {
+				fmt.Println("XXX WorkflowPropertiesMutateVisitor !hasKey case")
 				cm.Data = make(map[string]string, 1)
 				cm.Data[workflowproj.ApplicationPropertiesFileName] = ImmutableApplicationProperties(workflow)
 				return nil
@@ -113,7 +123,7 @@ func WorkflowPropertiesMutateVisitor(workflow *operatorapi.SonataFlow) MutateVis
 			cm.Data[workflowproj.ApplicationPropertiesFileName] =
 				NewAppPropertyHandler(workflow).
 					WithUserProperties(cm.Data[workflowproj.ApplicationPropertiesFileName]).
-					Build()
+					Build(ctx, catalog)
 
 			return nil
 		}
