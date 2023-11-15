@@ -24,7 +24,7 @@ const (
 	latestImageTag              = "latest"
 	nightlySuffix               = "nightly"
 	defaultWorkflowDevModeImage = "quay.io/kiegroup/kogito-swf-devmode"
-	defaultWorkflowBuilderImage = "quay.io/kiegroup/kogito-swf-builder"
+	defaultWorkflowBuilderImage = "quay.io/wmedvede/kogito-swf-builder"
 	defaultOperatorImage        = "quay.io/kiegroup/kogito-serverless-operator"
 )
 
@@ -42,7 +42,8 @@ func GetDefaultWorkflowDevModeImageTag() string {
 }
 
 func GetDefaultWorkflowBuilderImageTag() string {
-	return GetDefaultImageTag(defaultWorkflowBuilderImage)
+	return "quay.io/wmedvede/kogito-swf-builder:latest"
+	//return GetDefaultImageTag(defaultWorkflowBuilderImage)
 }
 
 func GetDefaultOperatorImageTag() string {
