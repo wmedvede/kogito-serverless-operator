@@ -23,19 +23,52 @@ import (
 	"context"
 	"fmt"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	clienteventingv1 "knative.dev/eventing/pkg/client/clientset/versioned/typed/eventing/v1"
+	clientservingv1 "knative.dev/serving/pkg/client/clientset/versioned/typed/serving/v1"
+)
+
+const (
+	knServiceKind = "services"
+	knBrokerKind  = "brokers"
 )
 
 type knServiceCatalog struct {
-	Client client.Client
+	ServingClient  clientservingv1.ServingV1Interface
+	EventingClient clienteventingv1.EventingV1Interface
 }
 
-func newKnServiceCatalog(cli client.Client) knServiceCatalog {
+func newKnServiceCatalog(servingClient clientservingv1.ServingV1Interface, eventingClient clienteventingv1.EventingV1Interface) knServiceCatalog {
 	return knServiceCatalog{
-		Client: cli,
+		ServingClient:  servingClient,
+		EventingClient: eventingClient,
 	}
 }
 
 func (c knServiceCatalog) Query(ctx context.Context, uri ResourceUri, outputFormat string) (string, error) {
-	return "", fmt.Errorf("knative service discovery is not yet implemened")
+	switch uri.GVK.Kind {
+	case knServiceKind:
+		return c.resolveKnServiceQuery(ctx, uri)
+	case knBrokerKind:
+		return c.resolveKnBrokerQuery(ctx, uri)
+	default:
+		return "", fmt.Errorf("resolution of knative kind: %s is not implemented", uri.GVK.Kind)
+	}
+}
+
+func (c knServiceCatalog) resolveKnServiceQuery(ctx context.Context, uri ResourceUri) (string, error) {
+	if service, err := c.ServingClient.Services(uri.Namespace).Get(ctx, uri.Name, metav1.GetOptions{}); err != nil {
+		return "", err
+	} else {
+		return service.Status.URL.String(), nil
+	}
+}
+
+func (c knServiceCatalog) resolveKnBrokerQuery(ctx context.Context, uri ResourceUri) (string, error) {
+	if broker, err := c.EventingClient.Brokers(uri.Namespace).Get(ctx, uri.Name, metav1.GetOptions{}); err != nil {
+		return "", err
+	} else {
+		return broker.Status.Address.URL.String(), nil
+	}
 }

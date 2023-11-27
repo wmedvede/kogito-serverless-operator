@@ -20,6 +20,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
@@ -44,7 +45,11 @@ import (
 
 	operatorapi "github.com/apache/incubator-kie-kogito-serverless-operator/api/v1alpha08"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/log"
+
 	//+kubebuilder:scaffold:imports
+
+	clienteventingv1 "knative.dev/eventing/pkg/client/clientset/versioned/typed/eventing/v1"
+	clientservingv1 "knative.dev/serving/pkg/client/clientset/versioned/typed/serving/v1"
 )
 
 var (
@@ -61,6 +66,9 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var knativeServingClient *clientservingv1.ServingV1Client
+	var knativeEventingClient *clienteventingv1.EventingV1Client
+
 	klog.InitFlags(nil)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -85,9 +93,34 @@ func main() {
 	}
 
 	utils.SetIsOpenShift(mgr.GetConfig())
+	utils.SetIsKnative(context.TODO(), mgr.GetClient())
+
+	if utils.IsKnativeServing() {
+		klog.V(log.I).Infof("Knative serving is installed in the cluster")
+		if knativeServingClient, err = utils.NewKnativeServingClient(mgr.GetConfig()); err != nil {
+			if err != nil {
+				klog.V(log.E).ErrorS(err, "unable to connect with the knative serving system")
+				os.Exit(1)
+			}
+		}
+	}
+
+	if utils.IsKnativeEventing() {
+		klog.V(log.I).Infof("Knative eventing is installed in the cluster")
+		if knativeEventingClient, err = utils.NewKnativeEventingClient(mgr.GetConfig()); err != nil {
+			if err != nil {
+				klog.V(log.E).ErrorS(err, "unable to connect with the knative eventing system")
+				os.Exit(1)
+			}
+		}
+	}
 
 	if err = (&controllers.SonataFlowReconciler{
-		Client:   mgr.GetClient(),
+		Client: mgr.GetClient(),
+		Extensions: controllers.ReconcilerExtensions{
+			KnServingClient:  knativeServingClient,
+			KnEventingClient: knativeEventingClient,
+		},
 		Scheme:   mgr.GetScheme(),
 		Config:   mgr.GetConfig(),
 		Recorder: mgr.GetEventRecorderFor("workflow-controller"),
