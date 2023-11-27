@@ -20,11 +20,15 @@
 package utils
 
 import (
+	"k8s.io/client-go/discovery"
+
 	"github.com/RHsyseng/operator-utils/pkg/utils/openshift"
 	"k8s.io/client-go/rest"
 )
 
 var isOpenShift = false
+var isKnativeEventing = false
+var isKnativeServing = false
 
 // IsOpenShift is a global flag that can be safely called across reconciliation cycles, defined at the controller manager start.
 func IsOpenShift() bool {
@@ -37,6 +41,36 @@ func SetIsOpenShift(cfg *rest.Config) {
 	var err error
 	isOpenShift, err = openshift.IsOpenShift(cfg)
 	if err != nil {
-		panic("Impossible to verify if the cluster is OpenShift or not" + err.Error())
+		panic("Impossible to verify if the cluster is OpenShift or not: " + err.Error())
+	}
+}
+
+// IsKnativeServing is a global flag that can be safely called across reconciliation cycles, defined at the controller manager start.
+func IsKnativeServing() bool {
+	return isKnativeServing
+}
+
+// IsKnativeEventing is a global flag that can be safely called across reconciliation cycles, defined at the controller manager start.
+func IsKnativeEventing() bool {
+	return isKnativeEventing
+}
+
+// SetIsKnative sets the global flags isKnativeServing and isKnativeEventing by the controller manager.
+func SetIsKnative(cfg *rest.Config) {
+	if cli, err := discovery.NewDiscoveryClientForConfig(cfg); err != nil {
+		panic("Impossible to verify if the knative system is installed in the cluster: " + err.Error())
+	} else {
+		apiList, err := cli.ServerGroups()
+		if err != nil {
+			panic("Unable to fetch ServerGroups, it was not possible to determine if knative is installed in the cluster: " + err.Error())
+		}
+		for _, group := range apiList.Groups {
+			if group.Name == "serving.knative.dev" {
+				isKnativeServing = true
+			}
+			if group.Name == "eventing.knative.dev" {
+				isKnativeEventing = true
+			}
+		}
 	}
 }

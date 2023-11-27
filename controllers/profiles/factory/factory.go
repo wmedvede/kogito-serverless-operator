@@ -35,7 +35,7 @@ const (
 	opsProfile metadata.ProfileType = "prod_for_ops"
 )
 
-type reconcilerBuilder func(client client.Client) profiles.ProfileReconciler
+type reconcilerBuilder func(client client.Client, extensions profiles.ProfileExtensions) profiles.ProfileReconciler
 
 var profileBuilders = map[metadata.ProfileType]reconcilerBuilder{
 	metadata.ProdProfile: prod.NewProfileReconciler,
@@ -58,6 +58,6 @@ func profileBuilder(workflow *operatorapi.SonataFlow) reconcilerBuilder {
 }
 
 // NewReconciler creates a new ProfileReconciler based on the given workflow and context.
-func NewReconciler(client client.Client, workflow *operatorapi.SonataFlow) profiles.ProfileReconciler {
-	return profileBuilder(workflow)(client)
+func NewReconciler(client client.Client, extensions profiles.ProfileExtensions, workflow *operatorapi.SonataFlow) profiles.ProfileReconciler {
+	return profileBuilder(workflow)(client, extensions)
 }

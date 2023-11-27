@@ -23,9 +23,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles"
+	clienteventingv1 "knative.dev/eventing/pkg/client/clientset/versioned/typed/eventing/v1"
+	clientservingv1 "knative.dev/serving/pkg/client/clientset/versioned/typed/serving/v1"
+
 	"k8s.io/klog/v2"
 
-	profiles "github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/factory"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/factory"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -50,10 +54,16 @@ import (
 
 // SonataFlowReconciler reconciles a SonataFlow object
 type SonataFlowReconciler struct {
-	Client   client.Client
-	Scheme   *runtime.Scheme
-	Config   *rest.Config
-	Recorder record.EventRecorder
+	Client     client.Client
+	Extensions ReconcilerExtensions
+	Scheme     *runtime.Scheme
+	Config     *rest.Config
+	Recorder   record.EventRecorder
+}
+
+type ReconcilerExtensions struct {
+	KnServingClient  clientservingv1.ServingV1Interface
+	KnEventingClient clienteventingv1.EventingV1Interface
 }
 
 //+kubebuilder:rbac:groups=sonataflow.org,resources=sonataflows,verbs=get;list;watch;create;update;patch;delete
@@ -95,7 +105,10 @@ func (r *SonataFlowReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return reconcile.Result{}, nil
 	}
 
-	return profiles.NewReconciler(r.Client, workflow).Reconcile(ctx, workflow)
+	return factory.NewReconciler(r.Client, profiles.ProfileExtensions{
+		KnServingClient:  r.Extensions.KnServingClient,
+		KnEventingClient: r.Extensions.KnEventingClient,
+	}, workflow).Reconcile(ctx, workflow)
 }
 
 func platformEnqueueRequestsFromMapFunc(c client.Client, p *operatorapi.SonataFlowPlatform) []reconcile.Request {

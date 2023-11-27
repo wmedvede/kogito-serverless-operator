@@ -47,6 +47,21 @@ const (
 	myService2Address = "http://10.110.90.2:80"
 	myService3        = "my-service3"
 	myService3Address = "http://10.110.90.3:80"
+
+	myKnService1        = "my-kn-service1"
+	myKnService1Address = "http://my-kn-sevice1.namespace1.svc.cluster.local"
+
+	myKnService2        = "my-kn-service2"
+	myKnService2Address = "http://my-kn-sevice2.namespace1.svc.cluster.local"
+
+	myKnService3        = "my-kn-service3"
+	myKnService3Address = "http://my-kn-sevice3.default-namespace.svc.cluster.local"
+
+	myKnBroker1        = "my-kn-broker1"
+	myKnBroker1Address = "http://broker-ingress.knative-eventing.svc.cluster.local/namespace1/my-kn-broker1"
+
+	myKnBroker2        = "my-kn-broker2"
+	myKnBroker2Address = "http://broker-ingress.knative-eventing.svc.cluster.local/default-namespace/my-kn-broker2"
 )
 
 type mockCatalogService struct {
@@ -62,6 +77,22 @@ func (c *mockCatalogService) Query(ctx context.Context, uri discovery.ResourceUr
 	if uri.Scheme == discovery.KubernetesScheme && uri.Name == myService3 && uri.Namespace == defaultNamespace && uri.GetPort() == "http-port" {
 		return myService3Address, nil
 	}
+	if uri.Scheme == discovery.KnativeScheme && uri.Name == myKnService1 && uri.Namespace == namespace1 {
+		return myKnService1Address, nil
+	}
+	if uri.Scheme == discovery.KnativeScheme && uri.Name == myKnService2 && uri.Namespace == namespace1 {
+		return myKnService2Address, nil
+	}
+	if uri.Scheme == discovery.KnativeScheme && uri.Name == myKnService3 && uri.Namespace == defaultNamespace {
+		return myKnService3Address, nil
+	}
+	if uri.Scheme == discovery.KnativeScheme && uri.Name == myKnBroker1 && uri.Namespace == namespace1 {
+		return myKnBroker1Address, nil
+	}
+	if uri.Scheme == discovery.KnativeScheme && uri.Name == myKnBroker2 && uri.Namespace == defaultNamespace {
+		return myKnBroker2Address, nil
+	}
+
 	return "", nil
 }
 
@@ -156,6 +187,11 @@ func Test_appPropertyHandler_WithUserPropertiesWithServiceDiscovery(t *testing.T
 	//add some user properties that requires service discovery
 	userProperties = userProperties + "service1=${kubernetes:services.v1/namespace1/my-service1}\n"
 	userProperties = userProperties + "service2=${kubernetes:services.v1/my-service2}\n"
+	userProperties = userProperties + "service3=${knative:namespace1/my-kn-service1}\n"
+	userProperties = userProperties + "service4=${knative:services.v1.serving.knative.dev/namespace1/my-kn-service2}\n"
+	userProperties = userProperties + "service5=${knative:services.v1.serving.knative.dev/my-kn-service3}\n"
+	userProperties = userProperties + "broker1=${knative:brokers.v1.eventing.knative.dev/namespace1/my-kn-broker1}\n"
+	userProperties = userProperties + "broker2=${knative:brokers.v1.eventing.knative.dev/my-kn-broker2}\n"
 
 	workflow := test.GetBaseSonataFlow(defaultNamespace)
 	props := NewAppPropertyHandler(workflow, nil).
@@ -165,16 +201,23 @@ func Test_appPropertyHandler_WithUserPropertiesWithServiceDiscovery(t *testing.T
 	generatedProps, propsErr := properties.LoadString(props)
 	generatedProps.DisableExpansion = true
 	assert.NoError(t, propsErr)
-	assert.Equal(t, 12, len(generatedProps.Keys()))
+	assert.Equal(t, 22, len(generatedProps.Keys()))
 	assertHasProperty(t, generatedProps, "property1", "value1")
 	assertHasProperty(t, generatedProps, "property2", "value2")
 
 	assertHasProperty(t, generatedProps, "service1", "${kubernetes:services.v1/namespace1/my-service1}")
 	assertHasProperty(t, generatedProps, "service2", "${kubernetes:services.v1/my-service2}")
+	assertHasProperty(t, generatedProps, "service3", "${knative:namespace1/my-kn-service1}")
+
 	//org.kie.kogito.addons.discovery.kubernetes\:services.v1\/usecase1º/my-service1 below we use the unescaped vale because the properties.LoadString removes them.
 	assertHasProperty(t, generatedProps, "org.kie.kogito.addons.discovery.kubernetes:services.v1/namespace1/my-service1", myService1Address)
 	//org.kie.kogito.addons.discovery.kubernetes\:services.v1\/my-service2 below we use the unescaped vale because the properties.LoadString removes them.
 	assertHasProperty(t, generatedProps, "org.kie.kogito.addons.discovery.kubernetes:services.v1/my-service2", myService2Address)
+	assertHasProperty(t, generatedProps, "org.kie.kogito.addons.discovery.knative:namespace1/my-kn-service1", myKnService1Address)
+	assertHasProperty(t, generatedProps, "org.kie.kogito.addons.discovery.knative:services.v1.serving.knative.dev/namespace1/my-kn-service2", myKnService2Address)
+	assertHasProperty(t, generatedProps, "org.kie.kogito.addons.discovery.knative:services.v1.serving.knative.dev/my-kn-service3", myKnService3Address)
+	assertHasProperty(t, generatedProps, "org.kie.kogito.addons.discovery.knative:brokers.v1.eventing.knative.dev/namespace1/my-kn-broker1", myKnBroker1Address)
+	assertHasProperty(t, generatedProps, "org.kie.kogito.addons.discovery.knative:brokers.v1.eventing.knative.dev/my-kn-broker2", myKnBroker2Address)
 
 	assertHasProperty(t, generatedProps, "kogito.service.url", fmt.Sprintf("http://greeting.%s", defaultNamespace))
 	assertHasProperty(t, generatedProps, "quarkus.http.port", "8080")
