@@ -22,7 +22,6 @@ package common
 import (
 	"context"
 	"fmt"
-
 	"regexp"
 	"strings"
 
@@ -53,6 +52,8 @@ const (
 
 	microprofileServiceCatalogPropertyPrefix = "org.kie.kogito.addons.discovery."
 	discoveryLikePropertyPattern             = "^\\${(kubernetes|knative|openshift):(.*)}$"
+
+	knativeServiceOperationPrefix = "knative:services.v1.serving.knative.dev"
 )
 
 var immutableApplicationProperties = "quarkus.http.port=" + DefaultHTTPWorkflowPortIntStr.String() + "\n" +
@@ -261,6 +262,35 @@ func generateDiscoveryProperties(ctx context.Context, catalog discovery.ServiceC
 				} else {
 					klog.V(log.I).Infof("Service: %s was resolved into the following address: %s.", plainUri, address)
 					mpProperty := generateMicroprofileServiceCatalogProperty(plainUri)
+					klog.V(log.I).Infof("Generating microprofile service catalog property %s=%s.", mpProperty, address)
+					result.MustSet(mpProperty, address)
+				}
+			}
+		}
+	}
+
+	for _, function := range workflow.Spec.Flow.Functions {
+		klog.V(log.I).Infof("Scanning function: %s for service discovery configuration.", function.Name)
+		if strings.HasPrefix(function.Operation, knativeServiceOperationPrefix) {
+			klog.V(log.I).Infof("Function %s looks to be a knative service invocation on service: %s.", function.Name, function.Operation)
+			if uri, err := discovery.ParseUri(function.Operation); err != nil {
+				klog.V(log.I).Infof("Operation: %s not correspond to a valid service discovery configuration, it will be excluded from service discovery.", function.Operation)
+			} else {
+				if len(uri.Namespace) == 0 {
+					klog.V(log.I).Infof("Current operation has no configured namespace, workflow namespace: %s will be used instead.", workflow.Namespace)
+					uri.Namespace = workflow.Namespace
+				}
+				if address, err := catalog.Query(ctx, *uri, ""); err != nil {
+					klog.V(log.E).ErrorS(err, "An error was produced during service address resolution.", "serviceUri", function.Operation)
+				} else {
+					// when the knative service is invoked from the workflow as an Operation, the query params are not
+					// used for the microprofile property generation.
+					trimmedUri := function.Operation
+					if questionMarkIndex := strings.Index(trimmedUri, "?"); questionMarkIndex > 0 {
+						trimmedUri = function.Operation[:questionMarkIndex]
+					}
+					klog.V(log.I).Infof("Service: %s was resolved into the following address: %s.", function.Operation, address)
+					mpProperty := generateMicroprofileServiceCatalogProperty(trimmedUri)
 					klog.V(log.I).Infof("Generating microprofile service catalog property %s=%s.", mpProperty, address)
 					result.MustSet(mpProperty, address)
 				}

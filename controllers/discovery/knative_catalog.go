@@ -58,6 +58,9 @@ func (c knServiceCatalog) Query(ctx context.Context, uri ResourceUri, outputForm
 }
 
 func (c knServiceCatalog) resolveKnServiceQuery(ctx context.Context, uri ResourceUri) (string, error) {
+	if c.ServingClient == nil {
+		return "", fmt.Errorf("knative ServingClient was not provided, maybe the serving.knative.dev api is not installed in current cluster")
+	}
 	if service, err := c.ServingClient.Services(uri.Namespace).Get(ctx, uri.Name, metav1.GetOptions{}); err != nil {
 		return "", err
 	} else {
@@ -67,6 +70,9 @@ func (c knServiceCatalog) resolveKnServiceQuery(ctx context.Context, uri Resourc
 }
 
 func (c knServiceCatalog) resolveKnBrokerQuery(ctx context.Context, uri ResourceUri) (string, error) {
+	if c.EventingClient == nil {
+		return "", fmt.Errorf("knative EventingClient was not provided, maybe the eventing.knative.dev api is not installed in current cluster")
+	}
 	if broker, err := c.EventingClient.Brokers(uri.Namespace).Get(ctx, uri.Name, metav1.GetOptions{}); err != nil {
 		return "", err
 	} else {
