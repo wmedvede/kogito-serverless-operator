@@ -43,7 +43,7 @@ func Test_QueryKnativeService(t *testing.T) {
 
 func Test_QueryKnativeServiceNotFound(t *testing.T) {
 	_, client := fakeservingclient.With(context.TODO())
-	ctg := NewServiceCatalog(nil, client.ServingV1(), nil)
+	ctg := NewServiceCatalog(nil, NewKnDiscoveryClient(client.ServingV1(), nil))
 	doTestQueryWithError(t, ctg, *NewResourceUriBuilder(KnativeScheme).
 		Kind("services").
 		Group("serving.knative.dev").
@@ -72,7 +72,7 @@ func doTestQueryKnativeService(t *testing.T, expectedUri string) {
 		},
 	}
 	_, client := fakeservingclient.With(context.TODO(), service)
-	ctg := NewServiceCatalog(nil, client.ServingV1(), nil)
+	ctg := NewServiceCatalog(nil, NewKnDiscoveryClient(client.ServingV1(), nil))
 	doTestQuery(t, ctg, *NewResourceUriBuilder(KnativeScheme).
 		Kind("services").
 		Group("serving.knative.dev").
@@ -87,7 +87,7 @@ func Test_QueryKnativeBroker(t *testing.T) {
 
 func Test_QueryKnativeBrokerNotFound(t *testing.T) {
 	_, client := fakeeventingclient.With(context.TODO())
-	ctg := NewServiceCatalog(nil, nil, client.EventingV1())
+	ctg := NewServiceCatalog(nil, NewKnDiscoveryClient(nil, client.EventingV1()))
 	doTestQueryWithError(t, ctg, *NewResourceUriBuilder(KnativeScheme).
 		Kind("brokers").
 		Group("eventing.knative.dev").
@@ -115,7 +115,7 @@ func doTestQueryKnativeBroker(t *testing.T, expectedUri string) {
 		},
 	}
 	_, client := fakeeventingclient.With(context.TODO(), broker)
-	ctg := NewServiceCatalog(nil, nil, client.EventingV1())
+	ctg := NewServiceCatalog(nil, NewKnDiscoveryClient(nil, client.EventingV1()))
 	doTestQuery(t, ctg, *NewResourceUriBuilder(KnativeScheme).
 		Kind("brokers").
 		Group("eventing.knative.dev").

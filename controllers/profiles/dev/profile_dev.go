@@ -41,10 +41,10 @@ func (d developmentProfile) GetProfile() metadata.ProfileType {
 	return metadata.DevProfile
 }
 
-func NewProfileReconciler(client client.Client, extensions profiles.ProfileExtensions) profiles.ProfileReconciler {
+func NewProfileReconciler(client client.Client, knDiscoveryClient *discovery.KnDiscoveryClient) profiles.ProfileReconciler {
 	support := &common.StateSupport{
 		C:       client,
-		Catalog: discovery.NewServiceCatalog(client, extensions.KnServingClient, extensions.KnEventingClient),
+		Catalog: discovery.NewServiceCatalog(client, knDiscoveryClient),
 	}
 
 	var ensurers *objectEnsurers

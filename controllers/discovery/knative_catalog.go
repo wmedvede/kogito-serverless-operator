@@ -35,18 +35,31 @@ const (
 )
 
 type knServiceCatalog struct {
+	dc *KnDiscoveryClient
+}
+
+type KnDiscoveryClient struct {
 	ServingClient  clientservingv1.ServingV1Interface
 	EventingClient clienteventingv1.EventingV1Interface
 }
 
-func newKnServiceCatalog(servingClient clientservingv1.ServingV1Interface, eventingClient clienteventingv1.EventingV1Interface) knServiceCatalog {
+func newKnServiceCatalog(discoveryClient *KnDiscoveryClient) knServiceCatalog {
 	return knServiceCatalog{
+		dc: discoveryClient,
+	}
+}
+
+func NewKnDiscoveryClient(servingClient clientservingv1.ServingV1Interface, eventingClient clienteventingv1.EventingV1Interface) *KnDiscoveryClient {
+	return &KnDiscoveryClient{
 		ServingClient:  servingClient,
 		EventingClient: eventingClient,
 	}
 }
 
 func (c knServiceCatalog) Query(ctx context.Context, uri ResourceUri, outputFormat string) (string, error) {
+	if c.dc == nil {
+		return "", fmt.Errorf("knative KnDiscoveryClient was not provided, maybe knative is not installed in current cluster")
+	}
 	switch uri.GVK.Kind {
 	case knServiceKind:
 		return c.resolveKnServiceQuery(ctx, uri)
@@ -58,10 +71,10 @@ func (c knServiceCatalog) Query(ctx context.Context, uri ResourceUri, outputForm
 }
 
 func (c knServiceCatalog) resolveKnServiceQuery(ctx context.Context, uri ResourceUri) (string, error) {
-	if c.ServingClient == nil {
+	if c.dc.ServingClient == nil {
 		return "", fmt.Errorf("knative ServingClient was not provided, maybe the serving.knative.dev api is not installed in current cluster")
 	}
-	if service, err := c.ServingClient.Services(uri.Namespace).Get(ctx, uri.Name, metav1.GetOptions{}); err != nil {
+	if service, err := c.dc.ServingClient.Services(uri.Namespace).Get(ctx, uri.Name, metav1.GetOptions{}); err != nil {
 		return "", err
 	} else {
 		// knative objects discovery should rely on the addressable interface
@@ -70,10 +83,10 @@ func (c knServiceCatalog) resolveKnServiceQuery(ctx context.Context, uri Resourc
 }
 
 func (c knServiceCatalog) resolveKnBrokerQuery(ctx context.Context, uri ResourceUri) (string, error) {
-	if c.EventingClient == nil {
+	if c.dc.EventingClient == nil {
 		return "", fmt.Errorf("knative EventingClient was not provided, maybe the eventing.knative.dev api is not installed in current cluster")
 	}
-	if broker, err := c.EventingClient.Brokers(uri.Namespace).Get(ctx, uri.Name, metav1.GetOptions{}); err != nil {
+	if broker, err := c.dc.EventingClient.Brokers(uri.Namespace).Get(ctx, uri.Name, metav1.GetOptions{}); err != nil {
 		return "", err
 	} else {
 		// knative objects discovery should rely on the addressable interface

@@ -64,10 +64,10 @@ func newObjectEnsurers(support *common.StateSupport) *objectEnsurers {
 
 // NewProfileReconciler the default profile builder which includes a build state to run an internal build process
 // to have an immutable workflow image deployed
-func NewProfileReconciler(client client.Client, extensions profiles.ProfileExtensions) profiles.ProfileReconciler {
+func NewProfileReconciler(client client.Client, knDiscoveryClient *discovery.KnDiscoveryClient) profiles.ProfileReconciler {
 	support := &common.StateSupport{
 		C:       client,
-		Catalog: discovery.NewServiceCatalog(client, extensions.KnServingClient, extensions.KnEventingClient),
+		Catalog: discovery.NewServiceCatalog(client, knDiscoveryClient),
 	}
 	// the reconciliation state machine
 	stateMachine := common.NewReconciliationStateMachine(
@@ -84,10 +84,10 @@ func NewProfileReconciler(client client.Client, extensions profiles.ProfileExten
 
 // NewProfileForOpsReconciler creates an alternative prod profile that won't require to build the workflow image in order to deploy
 // the workflow application. It assumes that the image has been built somewhere else.
-func NewProfileForOpsReconciler(client client.Client, extensions profiles.ProfileExtensions) profiles.ProfileReconciler {
+func NewProfileForOpsReconciler(client client.Client, knDiscoveryClient *discovery.KnDiscoveryClient) profiles.ProfileReconciler {
 	support := &common.StateSupport{
 		C:       client,
-		Catalog: discovery.NewServiceCatalog(client, extensions.KnServingClient, extensions.KnEventingClient),
+		Catalog: discovery.NewServiceCatalog(client, knDiscoveryClient),
 	}
 	// the reconciliation state machine
 	stateMachine := common.NewReconciliationStateMachine(

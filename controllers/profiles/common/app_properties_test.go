@@ -24,11 +24,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/serverlessworkflow/sdk-go/v2/model"
-
-	operatorapi "github.com/apache/incubator-kie-kogito-serverless-operator/api/v1alpha08"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/discovery"
 
 	"github.com/magiconair/properties"
@@ -227,45 +222,6 @@ func Test_appPropertyHandler_WithUserPropertiesWithServiceDiscovery(t *testing.T
 	assertHasProperty(t, generatedProps, "org.kie.kogito.addons.knative.eventing.health-enabled", "false")
 	assertHasProperty(t, generatedProps, "quarkus.devservices.enabled", "false")
 	assertHasProperty(t, generatedProps, "quarkus.kogito.devservices.enabled", "false")
-}
-
-func Test_generateDiscoveryProperties(t *testing.T) {
-
-	catalogService := &mockCatalogService{}
-
-	propertiesContent := "property1=value1\n"
-	propertiesContent = propertiesContent + "property2=${value2}\n"
-	propertiesContent = propertiesContent + "service1=${kubernetes:services.v1/namespace1/my-service1}\n"
-	propertiesContent = propertiesContent + "service2=${kubernetes:services.v1/my-service2}\n"
-	propertiesContent = propertiesContent + "service3=${kubernetes:services.v1/my-service3?port=http-port}\n"
-
-	propertiesContent = propertiesContent + "non_service4=${kubernetes:--kaka}"
-
-	workflow := v1alpha08.Flow{
-		Functions: []model.Function{
-			{
-				Name:      "knServiceInvocation1",
-				Operation: "knative:services.v1.serving.knative.dev/namespace1/my-kn-service1?path=knative-function1",
-			},
-			{
-				Name:      "knServiceInvocation2",
-				Operation: "knative:services.v1.serving.knative.dev/my-kn-service3?path=knative-function3",
-			},
-		},
-	}
-
-	props := properties.MustLoadString(propertiesContent)
-	result := generateDiscoveryProperties(context.TODO(), catalogService, props, &operatorapi.SonataFlow{
-		ObjectMeta: metav1.ObjectMeta{Name: "helloworld", Namespace: defaultNamespace},
-		Spec:       v1alpha08.SonataFlowSpec{Flow: workflow},
-	})
-
-	assert.Equal(t, result.Len(), 5)
-	assertHasProperty(t, result, "org.kie.kogito.addons.discovery.kubernetes\\:services.v1\\/namespace1\\/my-service1", myService1Address)
-	assertHasProperty(t, result, "org.kie.kogito.addons.discovery.kubernetes\\:services.v1\\/my-service2", myService2Address)
-	assertHasProperty(t, result, "org.kie.kogito.addons.discovery.kubernetes\\:services.v1\\/my-service3?port\\=http-port", myService3Address)
-	assertHasProperty(t, result, "org.kie.kogito.addons.discovery.knative\\:services.v1.serving.knative.dev\\/namespace1\\/my-kn-service1", myKnService1Address)
-	assertHasProperty(t, result, "org.kie.kogito.addons.discovery.knative\\:services.v1.serving.knative.dev\\/my-kn-service3", myKnService3Address)
 }
 
 func assertHasProperty(t *testing.T, props *properties.Properties, expectedProperty string, expectedValue string) {

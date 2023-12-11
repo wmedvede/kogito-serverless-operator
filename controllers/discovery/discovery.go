@@ -23,10 +23,6 @@ import (
 	"context"
 	"fmt"
 
-	clienteventingv1 "knative.dev/eventing/pkg/client/clientset/versioned/typed/eventing/v1"
-
-	clientservingv1 "knative.dev/serving/pkg/client/clientset/versioned/typed/serving/v1"
-
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -89,10 +85,10 @@ type sonataFlowServiceCatalog struct {
 }
 
 // NewServiceCatalog returns a new ServiceCatalog configured to resolve kubernetes, knative, and openshift resource addresses.
-func NewServiceCatalog(cli client.Client, knServingClient clientservingv1.ServingV1Interface, knEventingClient clienteventingv1.EventingV1Interface) ServiceCatalog {
+func NewServiceCatalog(cli client.Client, knDiscoveryClient *KnDiscoveryClient) ServiceCatalog {
 	return &sonataFlowServiceCatalog{
 		kubernetesCatalog: newK8SServiceCatalog(cli),
-		knativeCatalog:    newKnServiceCatalog(knServingClient, knEventingClient),
+		knativeCatalog:    newKnServiceCatalog(knDiscoveryClient),
 	}
 }
 

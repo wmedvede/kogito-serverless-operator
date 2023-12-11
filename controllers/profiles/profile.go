@@ -22,9 +22,6 @@ package profiles
 import (
 	"context"
 
-	clienteventingv1 "knative.dev/eventing/pkg/client/clientset/versioned/typed/eventing/v1"
-	clientservingv1 "knative.dev/serving/pkg/client/clientset/versioned/typed/serving/v1"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -63,11 +60,6 @@ import (
 type ProfileReconciler interface {
 	Reconcile(ctx context.Context, workflow *operatorapi.SonataFlow) (ctrl.Result, error)
 	GetProfile() metadata.ProfileType
-}
-
-type ProfileExtensions struct {
-	KnServingClient  clientservingv1.ServingV1Interface
-	KnEventingClient clienteventingv1.EventingV1Interface
 }
 
 // ReconciliationState is an interface implemented internally by different reconciliation algorithms to perform the adequate logic for a given workflow profile
