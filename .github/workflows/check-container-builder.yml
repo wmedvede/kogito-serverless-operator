@@ -23,8 +23,7 @@ jobs:
     steps:
       - name: Install package
         run: |
-          sudo apt-get update &&\
-          sudo apt-get -y install --no-install-recommends \
+          sudo apt-get -y install \
           btrfs-progs \
           libgpgme-dev \
           libbtrfs-dev \

@@ -26,8 +26,7 @@ jobs:
       # Packages for testing with Podman
       - name: Install package
         run: |
-          sudo apt-get update &&\
-          sudo apt-get -y install --no-install-recommends \
+          sudo apt-get -y install \
           btrfs-progs \
           libgpgme-dev \
           libbtrfs-dev \
@@ -47,6 +46,10 @@ jobs:
 
       - name: Run tests
         run: make test test-workflowproj
+
+      - uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: cover.out
 
   check-headers:
     concurrency:
