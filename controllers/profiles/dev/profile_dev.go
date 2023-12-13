@@ -21,6 +21,7 @@ package dev
 
 import (
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/discovery"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -41,10 +42,10 @@ func (d developmentProfile) GetProfile() metadata.ProfileType {
 	return metadata.DevProfile
 }
 
-func NewProfileReconciler(client client.Client, knDiscoveryClient *discovery.KnDiscoveryClient) profiles.ProfileReconciler {
+func NewProfileReconciler(client client.Client, cfg *rest.Config) profiles.ProfileReconciler {
 	support := &common.StateSupport{
 		C:       client,
-		Catalog: discovery.NewServiceCatalog(client, knDiscoveryClient),
+		Catalog: discovery.NewServiceCatalogForConfig(client, cfg),
 	}
 
 	var ensurers *objectEnsurers

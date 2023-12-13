@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/client-go/rest"
+
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common"
@@ -47,7 +49,7 @@ func Test_Reconciler_ProdOps(t *testing.T) {
 	client := test.NewSonataFlowClientBuilder().
 		WithRuntimeObjects(workflow).
 		WithStatusSubresource(workflow, &operatorapi.SonataFlowBuild{}).Build()
-	result, err := NewProfileForOpsReconciler(client, nil).Reconcile(context.TODO(), workflow)
+	result, err := NewProfileForOpsReconciler(client, &rest.Config{}).Reconcile(context.TODO(), workflow)
 	assert.NoError(t, err)
 
 	assert.NotNil(t, result.RequeueAfter)
@@ -57,8 +59,8 @@ func Test_Reconciler_ProdOps(t *testing.T) {
 	// Since we don't have it in a mocked env, the result must be ready == false
 	assert.False(t, workflow.Status.IsReady())
 
-	// Reconcile again to run the ddeployment handler
-	result, err = NewProfileForOpsReconciler(client, nil).Reconcile(context.TODO(), workflow)
+	// Reconcile again to run the deployment handler
+	result, err = NewProfileForOpsReconciler(client, &rest.Config{}).Reconcile(context.TODO(), workflow)
 	assert.NoError(t, err)
 
 	// Let's check for the right creation of the workflow (one CM volume, one container with a custom image)
@@ -86,7 +88,7 @@ func Test_Reconciler_ProdCustomPod(t *testing.T) {
 	client := test.NewSonataFlowClientBuilder().
 		WithRuntimeObjects(workflow, build, platform).
 		WithStatusSubresource(workflow, build, platform).Build()
-	_, err := NewProfileReconciler(client, nil).Reconcile(context.TODO(), workflow)
+	_, err := NewProfileReconciler(client, &rest.Config{}).Reconcile(context.TODO(), workflow)
 	assert.NoError(t, err)
 
 	// Let's check for the right creation of the workflow (one CM volume, one container with a custom image)
@@ -107,7 +109,7 @@ func Test_reconcilerProdBuildConditions(t *testing.T) {
 		WithRuntimeObjects(workflow, platform).
 		WithStatusSubresource(workflow, platform, &operatorapi.SonataFlowBuild{}).Build()
 
-	result, err := NewProfileReconciler(client, nil).Reconcile(context.TODO(), workflow)
+	result, err := NewProfileReconciler(client, &rest.Config{}).Reconcile(context.TODO(), workflow)
 	assert.NoError(t, err)
 
 	assert.NotNil(t, result.RequeueAfter)
@@ -115,7 +117,7 @@ func Test_reconcilerProdBuildConditions(t *testing.T) {
 	assert.False(t, workflow.Status.IsReady())
 
 	// still building
-	result, err = NewProfileReconciler(client, nil).Reconcile(context.TODO(), workflow)
+	result, err = NewProfileReconciler(client, &rest.Config{}).Reconcile(context.TODO(), workflow)
 	assert.NoError(t, err)
 	assert.Equal(t, requeueWhileWaitForBuild, result.RequeueAfter)
 	assert.True(t, workflow.Status.IsBuildRunningOrUnknown())
@@ -128,7 +130,7 @@ func Test_reconcilerProdBuildConditions(t *testing.T) {
 	assert.NoError(t, client.Status().Update(context.TODO(), build))
 
 	// last reconciliation cycle waiting for build
-	result, err = NewProfileReconciler(client, nil).Reconcile(context.TODO(), workflow)
+	result, err = NewProfileReconciler(client, &rest.Config{}).Reconcile(context.TODO(), workflow)
 	assert.NoError(t, err)
 	assert.Equal(t, requeueWhileWaitForBuild, result.RequeueAfter)
 	assert.False(t, workflow.Status.IsBuildRunningOrUnknown())
@@ -136,7 +138,7 @@ func Test_reconcilerProdBuildConditions(t *testing.T) {
 	assert.Equal(t, api.WaitingForBuildReason, workflow.Status.GetTopLevelCondition().Reason)
 
 	// now we create the objects
-	result, err = NewProfileReconciler(client, nil).Reconcile(context.TODO(), workflow)
+	result, err = NewProfileReconciler(client, &rest.Config{}).Reconcile(context.TODO(), workflow)
 	assert.NoError(t, err)
 	assert.False(t, workflow.Status.IsBuildRunningOrUnknown())
 	assert.False(t, workflow.Status.IsReady())
@@ -154,7 +156,7 @@ func Test_reconcilerProdBuildConditions(t *testing.T) {
 	err = client.Status().Update(context.TODO(), deployment)
 	assert.NoError(t, err)
 
-	result, err = NewProfileReconciler(client, nil).Reconcile(context.TODO(), workflow)
+	result, err = NewProfileReconciler(client, &rest.Config{}).Reconcile(context.TODO(), workflow)
 	assert.NoError(t, err)
 	assert.False(t, workflow.Status.IsBuildRunningOrUnknown())
 	assert.True(t, workflow.Status.IsReady())

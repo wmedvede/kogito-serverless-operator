@@ -23,12 +23,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/knative"
-
-	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/discovery"
-	clienteventingv1 "knative.dev/eventing/pkg/client/clientset/versioned/typed/eventing/v1"
-	clientservingv1 "knative.dev/serving/pkg/client/clientset/versioned/typed/serving/v1"
-
 	"k8s.io/klog/v2"
 
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/factory"
@@ -101,7 +95,7 @@ func (r *SonataFlowReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return reconcile.Result{}, nil
 	}
 
-	return factory.NewReconciler(r.Client, buildKnDiscoveryClient(r.Config), workflow).Reconcile(ctx, workflow)
+	return factory.NewReconciler(r.Client, r.Config, workflow).Reconcile(ctx, workflow)
 }
 
 func platformEnqueueRequestsFromMapFunc(c client.Client, p *operatorapi.SonataFlowPlatform) []reconcile.Request {
@@ -196,33 +190,4 @@ func (r *SonataFlowReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return buildEnqueueRequestsFromMapFunc(mgr.GetClient(), build)
 		})).
 		Complete(r)
-}
-
-// buildKnDiscoveryClient returns a KnDiscoveryClient discovery client depending on the cluster status, if knative
-// serving nor knative eventing are installed, or it was not possible to create that client, returns null.
-func buildKnDiscoveryClient(cfg *rest.Config) *discovery.KnDiscoveryClient {
-	var servingClient clientservingv1.ServingV1Interface
-	var eventingClient clienteventingv1.EventingV1Interface
-
-	if info, err := knative.GetKnativeInfo(cfg); err != nil {
-		klog.V(log.E).ErrorS(err, "Unable to determine if knative is installed in the cluster")
-		return nil
-	} else {
-		if info.IsKnativeServing {
-			if servingClient, err = knative.GetKnativeServingClient(cfg); err != nil {
-				klog.V(log.E).ErrorS(err, "Unable to get the knative serving client")
-				return nil
-			}
-		}
-		if info.IsKnativeEventing {
-			if eventingClient, err = knative.GetKnativeEventingClient(cfg); err != nil {
-				klog.V(log.E).ErrorS(err, "Unable to get the knative eventing client")
-				return nil
-			}
-		}
-		if servingClient != nil || eventingClient != nil {
-			return discovery.NewKnDiscoveryClient(servingClient, eventingClient)
-		}
-	}
-	return nil
 }

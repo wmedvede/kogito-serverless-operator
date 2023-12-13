@@ -23,6 +23,8 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/client-go/rest"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -89,6 +91,13 @@ func NewServiceCatalog(cli client.Client, knDiscoveryClient *KnDiscoveryClient) 
 	return &sonataFlowServiceCatalog{
 		kubernetesCatalog: newK8SServiceCatalog(cli),
 		knativeCatalog:    newKnServiceCatalog(knDiscoveryClient),
+	}
+}
+
+func NewServiceCatalogForConfig(cli client.Client, cfg *rest.Config) ServiceCatalog {
+	return &sonataFlowServiceCatalog{
+		kubernetesCatalog: newK8SServiceCatalog(cli),
+		knativeCatalog:    newKnServiceCatalogForConfig(cfg),
 	}
 }
 

@@ -23,6 +23,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/knative"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/log"
+	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	clienteventingv1 "knative.dev/eventing/pkg/client/clientset/versioned/typed/eventing/v1"
@@ -49,7 +54,42 @@ func newKnServiceCatalog(discoveryClient *KnDiscoveryClient) knServiceCatalog {
 	}
 }
 
-func NewKnDiscoveryClient(servingClient clientservingv1.ServingV1Interface, eventingClient clienteventingv1.EventingV1Interface) *KnDiscoveryClient {
+func newKnServiceCatalogForConfig(cfg *rest.Config) knServiceCatalog {
+	return knServiceCatalog{
+		dc: newKnDiscoveryClientForConfig(cfg),
+	}
+}
+
+// newKnDiscoveryClientForConfig returns a KnDiscoveryClient discovery client depending on the cluster status, if knative
+// serving nor knative eventing are installed, or it was not possible to create that client, returns null.
+func newKnDiscoveryClientForConfig(cfg *rest.Config) *KnDiscoveryClient {
+	var servingClient clientservingv1.ServingV1Interface
+	var eventingClient clienteventingv1.EventingV1Interface
+
+	if avail, err := knative.GetKnativeAvailability(cfg); err != nil {
+		klog.V(log.E).ErrorS(err, "Unable to determine if knative is installed in the cluster")
+		return nil
+	} else {
+		if avail.Serving {
+			if servingClient, err = knative.GetKnativeServingClient(cfg); err != nil {
+				klog.V(log.E).ErrorS(err, "Unable to get the knative serving client")
+				return nil
+			}
+		}
+		if avail.Eventing {
+			if eventingClient, err = knative.GetKnativeEventingClient(cfg); err != nil {
+				klog.V(log.E).ErrorS(err, "Unable to get the knative eventing client")
+				return nil
+			}
+		}
+		if servingClient != nil || eventingClient != nil {
+			return newKnDiscoveryClient(servingClient, eventingClient)
+		}
+	}
+	return nil
+}
+
+func newKnDiscoveryClient(servingClient clientservingv1.ServingV1Interface, eventingClient clienteventingv1.EventingV1Interface) *KnDiscoveryClient {
 	return &KnDiscoveryClient{
 		ServingClient:  servingClient,
 		EventingClient: eventingClient,

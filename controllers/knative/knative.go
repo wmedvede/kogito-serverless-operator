@@ -29,9 +29,9 @@ import (
 var servingClient clientservingv1.ServingV1Interface
 var eventingClient clienteventingv1.EventingV1Interface
 
-type Info struct {
-	IsKnativeEventing bool
-	IsKnativeServing  bool
+type Availability struct {
+	Eventing bool
+	Serving  bool
 }
 
 func GetKnativeServingClient(cfg *rest.Config) (clientservingv1.ServingV1Interface, error) {
@@ -64,7 +64,7 @@ func NewKnativeEventingClient(cfg *rest.Config) (*clienteventingv1.EventingV1Cli
 	return clienteventingv1.NewForConfig(cfg)
 }
 
-func GetKnativeInfo(cfg *rest.Config) (*Info, error) {
+func GetKnativeAvailability(cfg *rest.Config) (*Availability, error) {
 	if cli, err := discovery.NewDiscoveryClientForConfig(cfg); err != nil {
 		return nil, err
 	} else {
@@ -72,13 +72,13 @@ func GetKnativeInfo(cfg *rest.Config) (*Info, error) {
 		if err != nil {
 			return nil, err
 		}
-		result := new(Info)
+		result := new(Availability)
 		for _, group := range apiList.Groups {
 			if group.Name == "serving.knative.dev" {
-				result.IsKnativeServing = true
+				result.Serving = true
 			}
 			if group.Name == "eventing.knative.dev" {
-				result.IsKnativeEventing = true
+				result.Eventing = true
 			}
 		}
 		return result, nil

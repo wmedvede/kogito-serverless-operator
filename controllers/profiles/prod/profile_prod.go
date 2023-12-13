@@ -22,6 +22,8 @@ package prod
 import (
 	"time"
 
+	"k8s.io/client-go/rest"
+
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/discovery"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -64,10 +66,10 @@ func newObjectEnsurers(support *common.StateSupport) *objectEnsurers {
 
 // NewProfileReconciler the default profile builder which includes a build state to run an internal build process
 // to have an immutable workflow image deployed
-func NewProfileReconciler(client client.Client, knDiscoveryClient *discovery.KnDiscoveryClient) profiles.ProfileReconciler {
+func NewProfileReconciler(client client.Client, cfg *rest.Config) profiles.ProfileReconciler {
 	support := &common.StateSupport{
 		C:       client,
-		Catalog: discovery.NewServiceCatalog(client, knDiscoveryClient),
+		Catalog: discovery.NewServiceCatalogForConfig(client, cfg),
 	}
 	// the reconciliation state machine
 	stateMachine := common.NewReconciliationStateMachine(
@@ -84,10 +86,10 @@ func NewProfileReconciler(client client.Client, knDiscoveryClient *discovery.KnD
 
 // NewProfileForOpsReconciler creates an alternative prod profile that won't require to build the workflow image in order to deploy
 // the workflow application. It assumes that the image has been built somewhere else.
-func NewProfileForOpsReconciler(client client.Client, knDiscoveryClient *discovery.KnDiscoveryClient) profiles.ProfileReconciler {
+func NewProfileForOpsReconciler(client client.Client, cfg *rest.Config) profiles.ProfileReconciler {
 	support := &common.StateSupport{
 		C:       client,
-		Catalog: discovery.NewServiceCatalog(client, knDiscoveryClient),
+		Catalog: discovery.NewServiceCatalogForConfig(client, cfg),
 	}
 	// the reconciliation state machine
 	stateMachine := common.NewReconciliationStateMachine(
