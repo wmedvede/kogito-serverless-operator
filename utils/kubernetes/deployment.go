@@ -1,16 +1,21 @@
-// Copyright 2023 Red Hat, Inc. and/or its affiliates
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 
 package kubernetes
 
@@ -98,14 +103,40 @@ func MarkDeploymentToRollout(deployment *appsv1.Deployment) error {
 
 // GetContainerByName returns a pointer to the Container within the given Deployment.
 // If none found, returns nil.
-func GetContainerByName(name string, deployment *appsv1.Deployment) *v1.Container {
-	if deployment == nil {
-		return nil
+// It also returns the position where the container was found, -1 if none
+func GetContainerByName(name string, podSpec *v1.PodSpec) (*v1.Container, int) {
+	if podSpec == nil {
+		return nil, -1
 	}
-	for _, container := range deployment.Spec.Template.Spec.Containers {
+	for i, container := range podSpec.Containers {
 		if container.Name == name {
-			return &container
+			return &container, i
 		}
 	}
-	return nil
+	return nil, -1
+}
+
+// GetContainerPortByName returns a pointer to the ContainerPort within the given Container.
+// If none found, returns nil.
+// It also returns the position where the container port was found, -1 if none.
+func GetContainerPortByName(name string, container *v1.Container) (*v1.ContainerPort, int) {
+	if container == nil {
+		return nil, -1
+	}
+	for i, containerPort := range container.Ports {
+		if name == containerPort.Name {
+			return &containerPort, i
+		}
+	}
+	return nil, -1
+}
+
+// AddOrReplaceContainer replace the existing container or add if it doesn't exist in the .spec.containers attribute
+func AddOrReplaceContainer(containerName string, container v1.Container, podSpec *v1.PodSpec) {
+	_, idx := GetContainerByName(containerName, podSpec)
+	if idx < 0 {
+		podSpec.Containers = append(podSpec.Containers, container)
+	} else {
+		podSpec.Containers[idx] = container
+	}
 }

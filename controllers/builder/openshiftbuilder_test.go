@@ -1,16 +1,21 @@
-// Copyright 2023 Red Hat, Inc. and/or its affiliates
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 
 package builder
 
@@ -26,9 +31,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	operatorapi "github.com/kiegroup/kogito-serverless-operator/api/v1alpha08"
-	"github.com/kiegroup/kogito-serverless-operator/controllers/workflowdef"
-	"github.com/kiegroup/kogito-serverless-operator/test"
+	operatorapi "github.com/apache/incubator-kie-kogito-serverless-operator/api/v1alpha08"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/workflowdef"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/test"
 )
 
 func Test_openshiftBuilderManager_Reconcile(t *testing.T) {
@@ -36,7 +41,7 @@ func Test_openshiftBuilderManager_Reconcile(t *testing.T) {
 	ns := t.Name()
 	workflow := test.GetBaseSonataFlow(ns)
 	platform := test.GetBasePlatformInReadyPhase(t.Name())
-	config := test.GetSonataFlowBuilderConfig("../../", ns)
+	config := test.GetSonataFlowBuilderConfig(ns)
 	namespacedName := types.NamespacedName{Namespace: workflow.Namespace, Name: workflow.Name}
 	client := test.NewKogitoClientBuilderWithOpenShift().WithRuntimeObjects(workflow, platform, config).Build()
 	buildClient := buildfake.NewSimpleClientset().BuildV1()
@@ -90,7 +95,7 @@ func Test_openshiftbuilder_externalCMs(t *testing.T) {
 	ns := t.Name()
 	workflow := test.GetBaseSonataFlow(ns)
 	platform := test.GetBasePlatformInReadyPhase(t.Name())
-	config := test.GetSonataFlowBuilderConfig("../../", ns)
+	config := test.GetSonataFlowBuilderConfig(ns)
 	externalCm := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "myopenapis",

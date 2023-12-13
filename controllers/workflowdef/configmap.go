@@ -1,16 +1,21 @@
-// Copyright 2023 Red Hat, Inc. and/or its affiliates
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 
 package workflowdef
 
@@ -23,9 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/kiegroup/kogito-serverless-operator/utils/kubernetes"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/utils/kubernetes"
 
-	operatorapi "github.com/kiegroup/kogito-serverless-operator/api/v1alpha08"
+	operatorapi "github.com/apache/incubator-kie-kogito-serverless-operator/api/v1alpha08"
 )
 
 const KogitoWorkflowJSONFileExt = ".sw.json"
@@ -43,8 +48,13 @@ func CreateNewConfigMap(workflow *operatorapi.SonataFlow) (*corev1.ConfigMap, er
 			Name:      workflow.Name,
 			Namespace: workflow.Namespace,
 		},
-		Data: map[string]string{workflow.Name + KogitoWorkflowJSONFileExt: string(workflowDef)},
+		Data: map[string]string{GetWorkflowDefFileName(workflow): string(workflowDef)},
 	}, nil
+}
+
+// GetWorkflowDefFileName returns the default workflow file definition that should be injected/mounted to a workflow application given a SonataFlow CR.
+func GetWorkflowDefFileName(workflow *operatorapi.SonataFlow) string {
+	return workflow.Name + KogitoWorkflowJSONFileExt
 }
 
 // FetchExternalResourcesConfigMapsRef fetches the Resource ConfigMaps into a LocalObjectReference that a client can mount to the workflow application.

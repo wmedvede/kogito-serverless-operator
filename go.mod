@@ -1,21 +1,21 @@
-module github.com/kiegroup/kogito-serverless-operator
+module github.com/apache/incubator-kie-kogito-serverless-operator
 
 go 1.19
 
 // Internal dependencies
 replace (
-	github.com/kiegroup/kogito-serverless-operator/api v0.0.0 => ./api
-	github.com/kiegroup/kogito-serverless-operator/container-builder v0.0.0 => ./container-builder
-	github.com/kiegroup/kogito-serverless-operator/workflowproj v0.0.0 => ./workflowproj
+	github.com/apache/incubator-kie-kogito-serverless-operator/api v0.0.0 => ./api
+	github.com/apache/incubator-kie-kogito-serverless-operator/container-builder v0.0.0 => ./container-builder
+	github.com/apache/incubator-kie-kogito-serverless-operator/workflowproj v0.0.0 => ./workflowproj
 )
 
 // Direct dependencies (please keep organized, no indirects)
 require (
-	github.com/RHsyseng/operator-utils v1.4.12
+	github.com/RHsyseng/operator-utils v1.4.13
+	github.com/apache/incubator-kie-kogito-serverless-operator/api v0.0.0
+	github.com/apache/incubator-kie-kogito-serverless-operator/container-builder v0.0.0
+	github.com/apache/incubator-kie-kogito-serverless-operator/workflowproj v0.0.0
 	github.com/go-logr/logr v1.2.4 // indirect
-	github.com/kiegroup/kogito-serverless-operator/api v0.0.0
-	github.com/kiegroup/kogito-serverless-operator/container-builder v0.0.0
-	github.com/kiegroup/kogito-serverless-operator/workflowproj v0.0.0
 	github.com/magiconair/properties v1.8.7
 	github.com/onsi/ginkgo/v2 v2.9.5
 	github.com/onsi/gomega v1.27.7
@@ -23,8 +23,8 @@ require (
 	github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.55.1
-	github.com/serverlessworkflow/sdk-go/v2 v2.2.4
-	github.com/stretchr/testify v1.8.2
+	github.com/serverlessworkflow/sdk-go/v2 v2.2.5
+	github.com/stretchr/testify v1.8.3
 	k8s.io/api v0.27.2
 	k8s.io/apimachinery v0.27.2
 	k8s.io/client-go v0.27.2
@@ -35,6 +35,7 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1
+	github.com/imdario/mergo v0.3.13
 	k8s.io/klog/v2 v2.100.1
 )
 
@@ -63,7 +64,6 @@ require (
 	github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
-	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -81,17 +81,18 @@ require (
 	github.com/prometheus/client_model v0.4.0 // indirect
 	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
+	github.com/relvacode/iso8601 v1.3.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.0 // indirect
 	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/vmware-labs/yaml-jsonpath v0.3.2 // indirect
-	golang.org/x/crypto v0.8.0 // indirect
-	golang.org/x/net v0.10.0 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.7.0 // indirect
 	golang.org/x/sync v0.2.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
-	golang.org/x/term v0.8.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/term v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.9.1 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
