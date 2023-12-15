@@ -121,6 +121,19 @@ test: manifests generate envtest vet fmt test-api ## Run tests.
 test-api:
 	cd api && make test
 
+######
+# Test proxy commands
+
+TEST_DIR=testbdd
+
+.PHONY: run-tests
+run-tests: generate-all
+	@(cd $(TEST_DIR) && $(MAKE) $@)
+
+.PHONY: run-smoke-tests
+run-smoke-tests: generate-all
+	@(cd $(TEST_DIR) && $(MAKE) $@)
+
 .PHONY: test-container-builder
 test-container-builder:
 	cd container-builder && make test
@@ -200,7 +213,7 @@ endif
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+	$(KUSTOMIZE) build config/crd | kubectl create -f -
 
 .PHONY: uninstall
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
@@ -209,7 +222,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
+	$(KUSTOMIZE) build config/default | kubectl create -f -
 
 .PHONY: generate-deploy
 generate-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
@@ -261,11 +274,11 @@ bundle: manifests kustomize install-operator-sdk ## Generate bundle manifests an
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	$(BUILDER)  build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(BUILDER) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
-	$(MAKE) contianer-push IMG=$(BUNDLE_IMG)
+	$(MAKE) container-push IMG=$(BUNDLE_IMG)
 
 .PHONY: opm
 OPM = ./bin/opm
@@ -301,7 +314,7 @@ endif
 # https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
 .PHONY: catalog-build
 catalog-build: opm ## Build a catalog image.
-	$(OPM) index add --container-tool $(BUILDER)  --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+	$(OPM) index add --container-tool $(BUILDER) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
 
 # Push the catalog image.
 .PHONY: catalog-push
@@ -320,6 +333,9 @@ bump-version:
 
 install-operator-sdk:
 	./hack/ci/install-operator-sdk.sh
+
+align-osl-config:
+	./hack/align-osl-config.sh
 
 .PHONY: addheaders
 addheaders:

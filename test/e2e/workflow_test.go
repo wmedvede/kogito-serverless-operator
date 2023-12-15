@@ -1,16 +1,21 @@
-// Copyright 2022 Red Hat, Inc. and/or its affiliates
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 
 package e2e
 
@@ -24,8 +29,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kiegroup/kogito-serverless-operator/test"
-	"github.com/kiegroup/kogito-serverless-operator/test/utils"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/test"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/test/utils"
 
 	//nolint:golint
 	//nolint:revive
@@ -47,14 +52,6 @@ const (
 var _ = Describe("SonataFlow Operator", Ordered, func() {
 
 	BeforeAll(func() {
-
-		// The namespace can be created when we run make install
-		// However, in this test we want to ensure that the solution
-		// can run in a ns labeled as restricted. Therefore, we are
-		// creating the namespace and labeling it.
-		By("creating manager namespace")
-		cmd := exec.Command("kubectl", "create", "ns", namespace)
-		_, _ = utils.Run(cmd)
 
 		// Now, let's ensure that all namespaces can raise a Warn when we apply the manifests
 		// and that the namespace where the Operator and Operand will run are enforced as
@@ -86,13 +83,8 @@ var _ = Describe("SonataFlow Operator", Ordered, func() {
 		operatorImageName, err := utils.GetOperatorImageName()
 		ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
-		By("installing CRDs")
-		cmd = exec.Command("make", "install")
-		_, err = utils.Run(cmd)
-		ExpectWithOffset(1, err).NotTo(HaveOccurred())
-
 		By("deploying the controller-manager")
-		cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", operatorImageName))
+		cmd := exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", operatorImageName))
 
 		outputMake, err := utils.Run(cmd)
 		fmt.Println(string(outputMake))
@@ -184,11 +176,21 @@ var _ = Describe("SonataFlow Operator", Ordered, func() {
 	Describe("ensure that Operator and Operand(s) can run in restricted namespaces", func() {
 		projectDir, _ := utils.GetProjectDir()
 
-		It("should create a basic platform for Minikube", func() {
-			By("creating an instance of the SonataFlowPlatform")
+		It("should successfully deploy the Simple Workflow in prod ops mode and verify if it's running", func() {
+			By("creating an instance of the SonataFlow Operand(CR)")
 			EventuallyWithOffset(1, func() error {
 				cmd := exec.Command("kubectl", "apply", "-f", filepath.Join(projectDir,
-					getSonataFlowPlatformFilename()), "-n", namespace)
+					"test/testdata/"+test.SonataFlowSimpleOpsYamlCR), "-n", namespace)
+				_, err := utils.Run(cmd)
+				return err
+			}, time.Minute, time.Second).Should(Succeed())
+
+			By("check the workflow is in running state")
+			EventuallyWithOffset(1, func() bool { return verifyWorkflowIsInRunningState("simple") }, 15*time.Minute, 30*time.Second).Should(BeTrue())
+
+			EventuallyWithOffset(1, func() error {
+				cmd := exec.Command("kubectl", "delete", "-f", filepath.Join(projectDir,
+					"test/testdata/"+test.SonataFlowSimpleOpsYamlCR), "-n", namespace)
 				_, err := utils.Run(cmd)
 				return err
 			}, time.Minute, time.Second).Should(Succeed())

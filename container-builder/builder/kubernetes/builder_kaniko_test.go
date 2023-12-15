@@ -1,16 +1,21 @@
-// Copyright 2023 Red Hat, Inc. and/or its affiliates
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 
 package kubernetes
 
@@ -26,9 +31,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/kiegroup/kogito-serverless-operator/container-builder/api"
-	"github.com/kiegroup/kogito-serverless-operator/container-builder/util"
-	"github.com/kiegroup/kogito-serverless-operator/container-builder/util/test"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/container-builder/api"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/container-builder/util"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/container-builder/util/test"
 )
 
 // Test that verify we are able to create a Kaniko build with cache enabled, a specific set of resources and additional flags
@@ -137,6 +142,9 @@ func TestNewBuildWithKanikoWithBuildArgsAndEnv(t *testing.T) {
 		WithBuildArgs([]v1.EnvVar{{
 			Name:  "QUARKUS_EXTENSIONS",
 			Value: "extension1,extension2",
+		}, {
+			Name:  "MY_PROPERTY",
+			Value: "my_property_value",
 		}}).
 		WithEnvs([]v1.EnvVar{{
 			Name:  "MYENV",
@@ -159,5 +167,6 @@ func TestNewBuildWithKanikoWithBuildArgsAndEnv(t *testing.T) {
 	assert.NotNil(t, pod)
 
 	assert.Subset(t, pod.Spec.Containers[0].Args, []string{"--build-arg=QUARKUS_EXTENSIONS=extension1,extension2"})
+	assert.Subset(t, pod.Spec.Containers[0].Args, []string{"--build-arg=MY_PROPERTY=my_property_value"})
 	assert.Subset(t, pod.Spec.Containers[0].Env, []v1.EnvVar{{Name: "MYENV", Value: "value"}})
 }
