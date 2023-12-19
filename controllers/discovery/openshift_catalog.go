@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/openshift"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/log"
@@ -25,6 +26,7 @@ type openShiftServiceCatalog struct {
 }
 
 type OpenShiftDiscoveryClient struct {
+	Client      client.Client
 	RouteClient routev1.RouteV1Interface
 	AppsClient  appsv1.AppsV1Interface
 }
@@ -41,10 +43,15 @@ func newOpenShiftServiceCatalogForConfig(cfg *rest.Config) openShiftServiceCatal
 }
 
 func newOpenShiftDiscoveryClientForConfig(cfg *rest.Config) *OpenShiftDiscoveryClient {
+	var cli client.Client
 	var routeClient routev1.RouteV1Interface
 	var appsClient appsv1.AppsV1Interface
 	var err error
 	if utils.IsOpenShift() {
+		if cli, err = client.New(cfg, client.Options{}); err != nil {
+			klog.V(log.E).ErrorS(err, "Unable to create the client")
+			return nil
+		}
 		if routeClient, err = openshift.GetRouteClient(cfg); err != nil {
 			klog.V(log.E).ErrorS(err, "Unable to get the openshift route client")
 			return nil
@@ -53,13 +60,14 @@ func newOpenShiftDiscoveryClientForConfig(cfg *rest.Config) *OpenShiftDiscoveryC
 			klog.V(log.E).ErrorS(err, "Unable to get the openshift apps client")
 			return nil
 		}
-		return newOpenShiftDiscoveryClient(routeClient, appsClient)
+		return newOpenShiftDiscoveryClient(cli, routeClient, appsClient)
 	}
 	return nil
 }
 
-func newOpenShiftDiscoveryClient(routeClient routev1.RouteV1Interface, appsClient appsv1.AppsV1Interface) *OpenShiftDiscoveryClient {
+func newOpenShiftDiscoveryClient(cli client.Client, routeClient routev1.RouteV1Interface, appsClient appsv1.AppsV1Interface) *OpenShiftDiscoveryClient {
 	return &OpenShiftDiscoveryClient{
+		Client:      cli,
 		RouteClient: routeClient,
 		AppsClient:  appsClient,
 	}
@@ -72,8 +80,8 @@ func (c openShiftServiceCatalog) Query(ctx context.Context, uri ResourceUri, out
 	switch uri.GVK.Kind {
 	case openShiftRoutes:
 		return c.resolveOpenShiftRouteQuery(ctx, uri)
-	case openshiftDeploymentConfigs:
-		return c.resolveOpenShiftDeploymentConfigQuery(ctx, uri)
+	case openShiftDeploymentConfigs:
+		return c.resolveOpenShiftDeploymentConfigQuery(ctx, uri, outputFormat)
 	default:
 		return "", fmt.Errorf("resolution of openshift kind: %s is not implemented", uri.GVK.Kind)
 	}
@@ -93,6 +101,17 @@ func (c openShiftServiceCatalog) resolveOpenShiftRouteQuery(ctx context.Context,
 	}
 }
 
-func (c openShiftServiceCatalog) resolveOpenShiftDeploymentConfigQuery(ctx context.Context, uri ResourceUri) (string, error) {
-	return "", nil
+func (c openShiftServiceCatalog) resolveOpenShiftDeploymentConfigQuery(ctx context.Context, uri ResourceUri, outputFormat string) (string, error) {
+	if deploymentConfig, err := c.dc.AppsClient.DeploymentConfigs(uri.Namespace).Get(ctx, uri.Name, metav1.GetOptions{}); err != nil {
+		return "", err
+	} else {
+		if serviceList, err := findServicesBySelectorTarget(ctx, c.dc.Client, uri.Namespace, deploymentConfig.Spec.Selector); err != nil {
+			return "", err
+		} else if len(serviceList.Items) == 0 {
+			return "", fmt.Errorf("no service was found for the deploymentConfig: %s in namespace: %s", uri.Name, uri.Namespace)
+		} else {
+			referenceService := selectBestSuitedServiceByCustomLabels(serviceList, uri.GetCustomLabels())
+			return resolveServiceUri(referenceService, uri.GetPort(), outputFormat)
+		}
+	}
 }
