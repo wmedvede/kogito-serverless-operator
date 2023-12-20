@@ -1,3 +1,22 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
 package discovery
 
 import (
@@ -36,22 +55,17 @@ func newOpenShiftServiceCatalog(discoveryClient *OpenShiftDiscoveryClient) openS
 		dc: discoveryClient,
 	}
 }
-func newOpenShiftServiceCatalogForConfig(cfg *rest.Config) openShiftServiceCatalog {
+func newOpenShiftServiceCatalogForClientAndConfig(cli client.Client, cfg *rest.Config) openShiftServiceCatalog {
 	return openShiftServiceCatalog{
-		dc: newOpenShiftDiscoveryClientForConfig(cfg),
+		dc: newOpenShiftDiscoveryClientForClientAndConfig(cli, cfg),
 	}
 }
 
-func newOpenShiftDiscoveryClientForConfig(cfg *rest.Config) *OpenShiftDiscoveryClient {
-	var cli client.Client
+func newOpenShiftDiscoveryClientForClientAndConfig(cli client.Client, cfg *rest.Config) *OpenShiftDiscoveryClient {
 	var routeClient routev1.RouteV1Interface
 	var appsClient appsv1.AppsV1Interface
 	var err error
 	if utils.IsOpenShift() {
-		if cli, err = client.New(cfg, client.Options{}); err != nil {
-			klog.V(log.E).ErrorS(err, "Unable to create the client")
-			return nil
-		}
 		if routeClient, err = openshift.GetRouteClient(cfg); err != nil {
 			klog.V(log.E).ErrorS(err, "Unable to get the openshift route client")
 			return nil
