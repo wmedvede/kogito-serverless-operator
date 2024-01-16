@@ -78,6 +78,7 @@ func NewProfileReconciler(client client.Client, cfg *rest.Config, recorder recor
 		&newBuilderState{StateSupport: support},
 		&followBuildStatusState{StateSupport: support},
 		&deployWithBuildWorkflowState{StateSupport: support, ensurers: newObjectEnsurers(support)},
+		&registerWorkflowState{StateSupport: support, ensurers: newObjectEnsurers(support)},
 	)
 	reconciler := &prodProfile{
 		Reconciler: common.NewReconciler(support, stateMachine),

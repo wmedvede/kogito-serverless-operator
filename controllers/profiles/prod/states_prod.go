@@ -21,6 +21,7 @@ package prod
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -204,4 +205,26 @@ func (h *deployWithBuildWorkflowState) isWorkflowChanged(workflow *operatorapi.S
 		return true
 	}
 	return false
+}
+
+type registerWorkflowState struct {
+	*common.StateSupport
+	ensurers           *objectEnsurers
+	deploymentVisitors []common.MutateVisitor
+}
+
+func (h *registerWorkflowState) CanReconcile(workflow *operatorapi.SonataFlow) bool {
+	// If we have a built ready, we should deploy the object
+	fmt.Println("XXXX registerWorkflowState.CanReconcile " + workflow.Name)
+	return workflow.Status.IsReady()
+}
+
+func (h *registerWorkflowState) Do(ctx context.Context, workflow *operatorapi.SonataFlow) (ctrl.Result, []client.Object, error) {
+	fmt.Println("XXXX registerWorkflowState.Do " + workflow.Name)
+	return ctrl.Result{}, nil, nil
+}
+
+func (h *registerWorkflowState) PostReconcile(ctx context.Context, workflow *operatorapi.SonataFlow) error {
+	fmt.Println("XXXX registerWorkflowState.PostReconcile " + workflow.Name)
+	return nil
 }
