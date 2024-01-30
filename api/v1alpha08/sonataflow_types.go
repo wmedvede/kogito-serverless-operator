@@ -657,6 +657,9 @@ type SonataFlowSpec struct {
 	// PodTemplate describes the deployment details of this SonataFlow instance.
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="podTemplate"
 	PodTemplate PodTemplateSpec `json:"podTemplate,omitempty"`
+	// Persists service to a datasource of choice. Ephemeral by default.
+	// +optional
+	Persistence *PersistenceOptions `json:"persistence,omitempty"`
 }
 
 // SonataFlowStatus defines the observed state of SonataFlow
@@ -694,7 +697,7 @@ func (s *SonataFlowStatus) Manager() api.ConditionsManager {
 }
 
 func (s *SonataFlowStatus) IsWaitingForPlatform() bool {
-	cond := s.GetCondition(api.RunningConditionType)
+	cond := s.GetCondition(api.BuiltConditionType)
 	return cond.IsFalse() && cond.Reason == api.WaitingForPlatformReason
 }
 

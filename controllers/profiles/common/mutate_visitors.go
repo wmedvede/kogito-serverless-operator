@@ -23,9 +23,11 @@ import (
 	"context"
 
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/discovery"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/properties"
 	"github.com/imdario/mergo"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -48,6 +50,7 @@ func ImageDeploymentMutateVisitor(workflow *operatorapi.SonataFlow, image string
 			deployment := object.(*appsv1.Deployment)
 			_, idx := kubeutil.GetContainerByName(operatorapi.DefaultContainerName, &deployment.Spec.Template.Spec)
 			deployment.Spec.Template.Spec.Containers[idx].Image = image
+			deployment.Spec.Template.Spec.Containers[idx].ImagePullPolicy = kubeutil.GetImagePullPolicy(image)
 			return nil
 		}
 	}
@@ -114,17 +117,22 @@ func WorkflowPropertiesMutateVisitor(ctx context.Context, catalog discovery.Serv
 			_, hasKey := cm.Data[workflowproj.ApplicationPropertiesFileName]
 			if !hasKey {
 				cm.Data = make(map[string]string, 1)
-				cm.Data[workflowproj.ApplicationPropertiesFileName] = ImmutableApplicationProperties(workflow, platform)
+				props, err := properties.ImmutableApplicationProperties(workflow, platform)
+				if err != nil {
+					return err
+				}
+				cm.Data[workflowproj.ApplicationPropertiesFileName] = props
 				return nil
 			}
 
 			// In the future, if this needs change, instead we can receive an AppPropertyHandler in this mutator
-			cm.Data[workflowproj.ApplicationPropertiesFileName] =
-				NewAppPropertyHandler(workflow, platform).
-					WithUserProperties(cm.Data[workflowproj.ApplicationPropertiesFileName]).
-					WithServiceDiscovery(ctx, catalog).
-					Build()
-
+			props, err := properties.NewAppPropertyHandler(workflow, platform)
+			if err != nil {
+				return err
+			}
+			cm.Data[workflowproj.ApplicationPropertiesFileName] = props.WithUserProperties(cm.Data[workflowproj.ApplicationPropertiesFileName]).
+				WithServiceDiscovery(ctx, catalog).
+				Build()
 			return nil
 		}
 	}
@@ -134,15 +142,12 @@ func WorkflowPropertiesMutateVisitor(ctx context.Context, catalog discovery.Serv
 // This method can be used as an alternative to the Kubernetes ConfigMap refresher.
 //
 // See: https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
-func RolloutDeploymentIfCMChangedMutateVisitor(cmOperationResult controllerutil.OperationResult) MutateVisitor {
+func RolloutDeploymentIfCMChangedMutateVisitor(cm *v1.ConfigMap) MutateVisitor {
 	return func(object client.Object) controllerutil.MutateFn {
 		return func() error {
-			if cmOperationResult == controllerutil.OperationResultUpdated {
-				deployment := object.(*appsv1.Deployment)
-				err := kubeutil.MarkDeploymentToRollout(deployment)
-				return err
-			}
-			return nil
+			deployment := object.(*appsv1.Deployment)
+			err := kubeutil.AnnotateDeploymentConfigChecksum(deployment, cm)
+			return err
 		}
 	}
 }

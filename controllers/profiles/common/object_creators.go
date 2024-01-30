@@ -28,6 +28,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	operatorapi "github.com/apache/incubator-kie-kogito-serverless-operator/api/v1alpha08"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/constants"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/persistence"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/properties"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/utils"
 	kubeutil "github.com/apache/incubator-kie-kogito-serverless-operator/utils/kubernetes"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/utils/openshift"
@@ -39,8 +42,7 @@ import (
 type ObjectCreator func(workflow *operatorapi.SonataFlow) (client.Object, error)
 
 const (
-	DefaultHTTPWorkflowPortInt = 8080
-	defaultHTTPServicePort     = 80
+	defaultHTTPServicePort = 80
 
 	// Quarkus Health Check Probe configuration.
 	// See: https://quarkus.io/guides/smallrye-health#running-the-health-check
@@ -56,9 +58,12 @@ const (
 	healthStartedFailureThreshold    = 5
 	healthStartedPeriodSeconds       = 15
 	healthStartedInitialDelaySeconds = 10
+	defaultSchemaName                = "default"
 )
 
-var DefaultHTTPWorkflowPortIntStr = intstr.FromInt(DefaultHTTPWorkflowPortInt)
+var (
+	DefaultHTTPWorkflowPortIntStr = intstr.FromInt(constants.DefaultHTTPWorkflowPortInt)
+)
 
 // DeploymentCreator is an objectCreator for a base Kubernetes Deployments for profiles that need to deploy the workflow on a vanilla deployment.
 // It serves as a basis for a basic Quarkus Java application, expected to listen on http 8080.
@@ -108,11 +113,11 @@ func getReplicasOrDefault(workflow *operatorapi.SonataFlow) *int32 {
 
 func defaultContainer(workflow *operatorapi.SonataFlow) (*corev1.Container, error) {
 	defaultContainerPort := corev1.ContainerPort{
-		ContainerPort: DefaultHTTPWorkflowPortInt,
+		ContainerPort: DefaultHTTPWorkflowPortIntStr.IntVal,
 		Name:          utils.HttpScheme,
 		Protocol:      corev1.ProtocolTCP,
 	}
-	defaultFlowContainer := corev1.Container{
+	defaultFlowContainer := &corev1.Container{
 		Name:                     operatorapi.DefaultContainerName,
 		Ports:                    []corev1.ContainerPort{defaultContainerPort},
 		TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
@@ -146,19 +151,19 @@ func defaultContainer(workflow *operatorapi.SonataFlow) (*corev1.Container, erro
 			FailureThreshold:    healthStartedFailureThreshold,
 			PeriodSeconds:       healthStartedPeriodSeconds,
 		},
-		ImagePullPolicy: corev1.PullAlways,
 		SecurityContext: kubeutil.SecurityDefaults(),
 	}
 	// Merge with flowContainer
-	if err := mergo.Merge(&defaultFlowContainer, workflow.Spec.PodTemplate.Container.ToContainer(), mergo.WithOverride); err != nil {
+	if err := mergo.Merge(defaultFlowContainer, workflow.Spec.PodTemplate.Container.ToContainer(), mergo.WithOverride); err != nil {
 		return nil, err
 	}
+	defaultFlowContainer = ConfigurePersistence(defaultFlowContainer, workflow.Spec.Persistence, defaultSchemaName, workflow.Namespace)
 	// immutable
 	defaultFlowContainer.Name = operatorapi.DefaultContainerName
 	portIdx := -1
 	for i := range defaultFlowContainer.Ports {
 		if defaultFlowContainer.Ports[i].Name == utils.HttpScheme ||
-			defaultFlowContainer.Ports[i].ContainerPort == DefaultHTTPWorkflowPortInt {
+			defaultFlowContainer.Ports[i].ContainerPort == DefaultHTTPWorkflowPortIntStr.IntVal {
 			portIdx = i
 			break
 		}
@@ -169,7 +174,7 @@ func defaultContainer(workflow *operatorapi.SonataFlow) (*corev1.Container, erro
 		defaultFlowContainer.Ports[portIdx] = defaultContainerPort
 	}
 
-	return &defaultFlowContainer, nil
+	return defaultFlowContainer, nil
 }
 
 // ServiceCreator is an objectCreator for a basic Service aiming a vanilla Kubernetes Deployment.
@@ -206,5 +211,17 @@ func OpenShiftRouteCreator(workflow *operatorapi.SonataFlow) (client.Object, err
 
 // WorkflowPropsConfigMapCreator creates a ConfigMap to hold the external application properties
 func WorkflowPropsConfigMapCreator(workflow *operatorapi.SonataFlow) (client.Object, error) {
-	return workflowproj.CreateNewAppPropsConfigMap(workflow, ImmutableApplicationProperties(workflow, nil)), nil
+	props, err := properties.ImmutableApplicationProperties(workflow, nil)
+	if err != nil {
+		return nil, err
+	}
+	return workflowproj.CreateNewAppPropsConfigMap(workflow, props), nil
+}
+
+func ConfigurePersistence(serviceContainer *corev1.Container, options *operatorapi.PersistenceOptions, defaultSchema, namespace string) *corev1.Container {
+	c := serviceContainer.DeepCopy()
+	if options != nil && options.PostgreSql != nil {
+		c.Env = append(c.Env, persistence.ConfigurePostgreSqlEnv(options.PostgreSql, defaultSchema, namespace)...)
+	}
+	return c
 }

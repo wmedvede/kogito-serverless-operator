@@ -146,7 +146,7 @@ test-workflowproj:
 
 .PHONY: build
 build: generate ## Build manager binary.
-	go build -o bin/manager main.go
+	CGO_ENABLED=0 go build -trimpath -ldflags=-buildid= -o bin/manager main.go
 
 .PHONY: build-4-debug
 build-4-debug: generate ## Build manager binary with debug options.
@@ -161,12 +161,12 @@ debug: build-4-debug ## Run a controller from your host from binary
 	./bin/manager -v=2
 
 .PHONY: docker-build
-docker-build: test ## Build docker image with the manager.
-	docker build -t ${IMG} .
+docker-build: generate ## Build docker image with the manager.
+	docker build --build-arg SOURCE_DATE_EPOCH="$(shell git log -1 --pretty=%ct)" -t ${IMG} .
 
 .PHONY: podman-build
-podman-build: test ## Build container image with the manager.
-	podman build -t ${IMG} .
+podman-build: generate ## Build container image with the manager.
+	podman build --build-arg SOURCE_DATE_EPOCH="$(shell git log -1 --pretty=%ct)" -t ${IMG} .
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -181,12 +181,12 @@ docker-push: ## Push docker image with the manager.
 # To properly provided solutions that supports more than one platform you should use this option.
 PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 .PHONY: docker-buildx
-docker-buildx: test ## Build and push docker image for the manager for cross-platform support
+docker-buildx: generate ## Build and push docker image for the manager for cross-platform support
 	# copy existing Dockerfile and insert --platform=${BUILDPLATFORM} into Dockerfile.cross, and preserve the original Dockerfile
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
 	- docker buildx create --name project-v3-builder
 	docker buildx use project-v3-builder
-	- docker buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross
+	- docker buildx build --build-arg SOURCE_DATE_EPOCH=$(shell git log -1 --pretty=%ct) --push --platform=$(PLATFORMS) --tag ${IMG} -f Dockerfile.cross
 	- docker buildx rm project-v3-builder
 	rm Dockerfile.cross
 
@@ -248,6 +248,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v4.5.2
 CONTROLLER_TOOLS_VERSION ?= v0.9.2
+KIND_VERSION ?= v0.20.0
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -346,7 +347,20 @@ generate-all: generate generate-deploy bundle addheaders vet fmt
 
 .PHONY: test-e2e # You will need to have a Minikube/Kind cluster up in running to run this target, and run container-builder before the test
 test-e2e: install-operator-sdk
-	go test ./test/e2e/* -v -ginkgo.v
+	go test ./test/e2e/* -v -ginkgo.v -timeout 30m
 
 .PHONY: before-pr
 before-pr: test generate-all
+
+
+.PHONY: install-kind
+install-kind:
+	command -v kind >/dev/null || go install sigs.k8s.io/kind@$(KIND_VERSION)
+
+.PHONY: create-cluster
+create-cluster: install-kind
+	kind get clusters | grep kind >/dev/null || ./hack/ci/create-kind-cluster-with-registry.sh
+
+.PHONY: delete-cluster
+delete-cluster: install-kind
+	kind delete cluster && docker rm -f kind-registry

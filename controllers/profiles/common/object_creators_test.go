@@ -20,6 +20,7 @@
 package common
 
 import (
+	"context"
 	"testing"
 
 	"github.com/magiconair/properties"
@@ -44,7 +45,7 @@ func Test_ensureWorkflowPropertiesConfigMapMutator(t *testing.T) {
 	cm.SetResourceVersion("1")
 	reflectCm := cm.(*corev1.ConfigMap)
 
-	visitor := WorkflowPropertiesMutateVisitor(nil, nil, workflow, nil)
+	visitor := WorkflowPropertiesMutateVisitor(context.TODO(), nil, workflow, nil)
 	mutateFn := visitor(cm)
 
 	assert.NoError(t, mutateFn())
@@ -77,7 +78,7 @@ func Test_ensureWorkflowPropertiesConfigMapMutator_DollarReplacement(t *testing.
 			workflowproj.ApplicationPropertiesFileName: "mp.messaging.outgoing.kogito_outgoing_stream.url=${kubernetes:services.v1/event-listener}",
 		},
 	}
-	mutateVisitorFn := WorkflowPropertiesMutateVisitor(nil, nil, workflow, nil)
+	mutateVisitorFn := WorkflowPropertiesMutateVisitor(context.TODO(), nil, workflow, nil)
 
 	err := mutateVisitorFn(existingCM)()
 	assert.NoError(t, err)
@@ -167,4 +168,172 @@ func TestMergePodSpec_OverrideContainers(t *testing.T) {
 	assert.NotEqual(t, "quay.io/example/my-workflow:1.0.0", flowContainer.Image)
 	assert.Equal(t, int32(8080), flowContainer.Ports[0].ContainerPort)
 	assert.Empty(t, flowContainer.Env)
+}
+
+func TestMergePodSpec_WithPostgreSQL_and_JDBC_URL_field(t *testing.T) {
+	workflow := test.GetBaseSonataFlow(t.Name())
+	workflow.Spec = v1alpha08.SonataFlowSpec{
+		PodTemplate: v1alpha08.PodTemplateSpec{
+			Container: v1alpha08.ContainerSpec{
+				// this one we can override
+				Image: "quay.io/example/my-workflow:1.0.0",
+				Ports: []corev1.ContainerPort{
+					// let's override a immutable attribute
+					{Name: utils.HttpScheme, ContainerPort: 9090},
+				},
+				Env: []corev1.EnvVar{
+					// We should be able to override this too
+					{Name: "ENV1", Value: "VALUE_CUSTOM"},
+				},
+				VolumeMounts: []corev1.VolumeMount{
+					{Name: "myvolume", ReadOnly: true, MountPath: "/tmp/any/path"},
+				},
+			},
+			PodSpec: v1alpha08.PodSpec{
+				ServiceAccountName: "superuser",
+				Containers: []corev1.Container{
+					{
+						Name: "sidecar",
+					},
+				},
+				Volumes: []corev1.Volume{
+					{
+						Name: "myvolume",
+						VolumeSource: corev1.VolumeSource{
+							ConfigMap: &corev1.ConfigMapVolumeSource{
+								LocalObjectReference: corev1.LocalObjectReference{Name: "customproperties"},
+							},
+						},
+					},
+				},
+			},
+		},
+		Persistence: &v1alpha08.PersistenceOptions{
+			PostgreSql: &v1alpha08.PersistencePostgreSql{
+				SecretRef: v1alpha08.PostgreSqlSecretOptions{Name: "test"},
+				JdbcUrl:   "jdbc:postgresql://host:port/database?currentSchema=workflow",
+			},
+		},
+	}
+
+	object, err := DeploymentCreator(workflow)
+	assert.NoError(t, err)
+
+	deployment := object.(*appsv1.Deployment)
+	expectedEnvVars := []corev1.EnvVar{
+		{
+			Name:  "ENV1",
+			Value: "VALUE_CUSTOM",
+		},
+		{
+			Name:  "QUARKUS_DATASOURCE_USERNAME",
+			Value: "",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "test"}, Key: "POSTGRESQL_USER",
+				},
+			},
+		},
+		{
+			Name:  "QUARKUS_DATASOURCE_PASSWORD",
+			Value: "",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "test"}, Key: "POSTGRESQL_PASSWORD",
+				},
+			},
+		},
+		{
+			Name:  "QUARKUS_DATASOURCE_DB_KIND",
+			Value: "postgresql",
+		},
+		{
+			Name:  "QUARKUS_DATASOURCE_JDBC_URL",
+			Value: "jdbc:postgresql://host:port/database?currentSchema=workflow",
+		},
+	}
+	assert.Len(t, deployment.Spec.Template.Spec.Containers, 2)
+	assert.Equal(t, "superuser", deployment.Spec.Template.Spec.ServiceAccountName)
+	assert.Len(t, deployment.Spec.Template.Spec.Volumes, 1)
+	flowContainer, _ := kubeutil.GetContainerByName(v1alpha08.DefaultContainerName, &deployment.Spec.Template.Spec)
+	assert.Equal(t, "quay.io/example/my-workflow:1.0.0", flowContainer.Image)
+	assert.Equal(t, int32(8080), flowContainer.Ports[0].ContainerPort)
+	assert.Equal(t, expectedEnvVars, flowContainer.Env)
+	assert.Len(t, flowContainer.VolumeMounts, 1)
+}
+
+var (
+	postgreSQLPort = 5432
+)
+
+func TestMergePodSpec_OverrideContainers_WithPostgreSQL_and_ServiceRef(t *testing.T) {
+	workflow := test.GetBaseSonataFlow(t.Name())
+	workflow.Spec = v1alpha08.SonataFlowSpec{
+		PodTemplate: v1alpha08.PodTemplateSpec{
+			PodSpec: v1alpha08.PodSpec{
+				// Try to override the workflow container via the podspec
+				Containers: []corev1.Container{
+					{
+						Name:  v1alpha08.DefaultContainerName,
+						Image: "quay.io/example/my-workflow:1.0.0",
+						Ports: []corev1.ContainerPort{
+							{Name: utils.HttpScheme, ContainerPort: 9090},
+						},
+						Env: []corev1.EnvVar{
+							{Name: "ENV1", Value: "VALUE_CUSTOM"},
+						},
+					},
+				},
+			},
+		},
+		Persistence: &v1alpha08.PersistenceOptions{
+			PostgreSql: &v1alpha08.PersistencePostgreSql{
+				SecretRef: v1alpha08.PostgreSqlSecretOptions{Name: "test"},
+				ServiceRef: &v1alpha08.PostgreSqlServiceOptions{
+					Name:           "test",
+					Namespace:      "foo",
+					Port:           &postgreSQLPort,
+					DatabaseName:   "petstore",
+					DatabaseSchema: "bar"},
+			},
+		},
+	}
+
+	object, err := DeploymentCreator(workflow)
+	assert.NoError(t, err)
+
+	deployment := object.(*appsv1.Deployment)
+	expectedEnvVars := []corev1.EnvVar{
+		{
+			Name:  "QUARKUS_DATASOURCE_USERNAME",
+			Value: "",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "test"}, Key: "POSTGRESQL_USER",
+				},
+			},
+		},
+		{
+			Name:  "QUARKUS_DATASOURCE_PASSWORD",
+			Value: "",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{Name: "test"}, Key: "POSTGRESQL_PASSWORD",
+				},
+			},
+		},
+		{
+			Name:  "QUARKUS_DATASOURCE_DB_KIND",
+			Value: "postgresql",
+		},
+		{
+			Name:  "QUARKUS_DATASOURCE_JDBC_URL",
+			Value: "jdbc:postgresql://test.foo:5432/petstore?currentSchema=bar",
+		},
+	}
+	assert.Len(t, deployment.Spec.Template.Spec.Containers, 1)
+	flowContainer, _ := kubeutil.GetContainerByName(v1alpha08.DefaultContainerName, &deployment.Spec.Template.Spec)
+	assert.Empty(t, flowContainer.Image)
+	assert.Equal(t, int32(8080), flowContainer.Ports[0].ContainerPort)
+	assert.Equal(t, expectedEnvVars, flowContainer.Env)
 }

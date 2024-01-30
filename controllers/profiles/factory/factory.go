@@ -20,6 +20,8 @@
 package factory
 
 import (
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apache/incubator-kie-kogito-serverless-operator/api/metadata"
@@ -35,7 +37,7 @@ const (
 	opsProfile metadata.ProfileType = "prod_for_ops"
 )
 
-type reconcilerBuilder func(client client.Client) profiles.ProfileReconciler
+type reconcilerBuilder func(client client.Client, cfg *rest.Config, recorder record.EventRecorder) profiles.ProfileReconciler
 
 var profileBuilders = map[metadata.ProfileType]reconcilerBuilder{
 	metadata.ProdProfile: prod.NewProfileReconciler,
@@ -58,6 +60,6 @@ func profileBuilder(workflow *operatorapi.SonataFlow) reconcilerBuilder {
 }
 
 // NewReconciler creates a new ProfileReconciler based on the given workflow and context.
-func NewReconciler(client client.Client, workflow *operatorapi.SonataFlow) profiles.ProfileReconciler {
-	return profileBuilder(workflow)(client)
+func NewReconciler(client client.Client, cfg *rest.Config, recorder record.EventRecorder, workflow *operatorapi.SonataFlow) profiles.ProfileReconciler {
+	return profileBuilder(workflow)(client, cfg, recorder)
 }

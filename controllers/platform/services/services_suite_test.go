@@ -17,17 +17,16 @@
  * under the License.
  */
 
-package common
+package services
 
-import "time"
+import (
+	"testing"
 
-const (
-	RequeueAfterFailure          = 3 * time.Minute
-	RequeueAfterFollowDeployment = 5 * time.Second
-	RequeueAfterIsRunning        = 1 * time.Minute
-	// RecoverDeploymentErrorRetries how many times the operator should try to recover from a failure before giving up
-	RecoverDeploymentErrorRetries = 3
-	// RequeueRecoverDeploymentErrorInterval interval between recovering from failures
-	RequeueRecoverDeploymentErrorInterval = RecoverDeploymentErrorInterval * time.Minute
-	RecoverDeploymentErrorInterval        = 10
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
+
+func TestServices(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Services Suite")
+}
