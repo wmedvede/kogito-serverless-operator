@@ -20,6 +20,7 @@
 package common
 
 import (
+	"fmt"
 	"github.com/imdario/mergo"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -72,6 +73,9 @@ var (
 // DeploymentCreator is an objectCreator for a base Kubernetes Deployments for profiles that need to deploy the workflow on a vanilla deployment.
 // It serves as a basis for a basic Quarkus Java application, expected to listen on http 8080.
 func DeploymentCreator(workflow *operatorapi.SonataFlow) (client.Object, error) {
+
+	fmt.Println("XXXX object_creators.go DeploymentCreator " + workflow.Name)
+
 	lbl := workflowproj.GetDefaultLabels(workflow)
 
 	deployment := &appsv1.Deployment{
@@ -94,9 +98,14 @@ func DeploymentCreator(workflow *operatorapi.SonataFlow) (client.Object, error) 
 		},
 	}
 
+	fmt.Println("XXXX object_creators.go deployment was created, deployment: " + deployment.String())
+
+	fmt.Println("XXXX object_creators.go merging workflow.spec.PodTemplate into the created deployment")
 	if err := mergo.Merge(&deployment.Spec.Template.Spec, workflow.Spec.PodTemplate.PodSpec.ToPodSpec(), mergo.WithOverride); err != nil {
 		return nil, err
 	}
+
+	fmt.Println("XXXX object_creators.go the merge was produced, merge result, deployment: " + deployment.String())
 
 	flowContainer, err := defaultContainer(workflow)
 	if err != nil {
@@ -104,6 +113,7 @@ func DeploymentCreator(workflow *operatorapi.SonataFlow) (client.Object, error) 
 	}
 	kubeutil.AddOrReplaceContainer(operatorapi.DefaultContainerName, *flowContainer, &deployment.Spec.Template.Spec)
 
+	fmt.Println("XXXX object_creators.go final deployment to return, deployment: " + deployment.String())
 	return deployment, nil
 }
 

@@ -20,6 +20,7 @@
 package dev
 
 import (
+	"fmt"
 	"path"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -55,12 +56,17 @@ func serviceCreator(workflow *operatorapi.SonataFlow) (client.Object, error) {
 }
 
 func deploymentCreator(workflow *operatorapi.SonataFlow) (client.Object, error) {
+	fmt.Println("XXXX object_creators_dev.go deploymentCreator " + workflow.Name)
+
 	obj, err := common.DeploymentCreator(workflow)
 	if err != nil {
 		return nil, err
 	}
 	deployment := obj.(*appsv1.Deployment)
 	_, idx := kubeutil.GetContainerByName(operatorapi.DefaultContainerName, &deployment.Spec.Template.Spec)
+
+	fmt.Println("XXXX object_creators_dev.go deploymentCreator , add the startup probes o the \"workflow\" container." + workflow.Name)
+
 	if workflow.Spec.PodTemplate.Container.StartupProbe == nil {
 		deployment.Spec.Template.Spec.Containers[idx].StartupProbe.FailureThreshold = healthFailureThresholdDevMode
 	}
@@ -70,6 +76,7 @@ func deploymentCreator(workflow *operatorapi.SonataFlow) (client.Object, error) 
 	if workflow.Spec.PodTemplate.Container.ReadinessProbe == nil {
 		deployment.Spec.Template.Spec.Containers[idx].ReadinessProbe.FailureThreshold = healthFailureThresholdDevMode
 	}
+	fmt.Println("XXXX object_creators_dev.go final created deployment: " + deployment.String())
 	return deployment, nil
 }
 
@@ -87,13 +94,20 @@ func workflowDefConfigMapCreator(workflow *operatorapi.SonataFlow) (client.Objec
 func deploymentMutateVisitor(workflow *operatorapi.SonataFlow) common.MutateVisitor {
 	return func(object client.Object) controllerutil.MutateFn {
 		return func() error {
+
+			fmt.Println("XXXX object_creators_dev.go deploymentMutateVisitor " + workflow.Name)
+
 			if kubeutil.IsObjectNew(object) {
+				fmt.Println("XXXX object_creators_dev.go deploymentMutateVisitor kubeutil.IsObjectNew, return " + workflow.Name)
+
 				return nil
 			}
 			original, err := deploymentCreator(workflow)
 			if err != nil {
 				return err
 			}
+			fmt.Println("XXXX object_creators_dev.go deploymentMutateVisitor common.EnsureDeployment " + workflow.Name)
+
 			common.EnsureDeployment(original.(*appsv1.Deployment), object.(*appsv1.Deployment))
 			return nil
 		}

@@ -21,6 +21,7 @@ package dev
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -62,11 +63,17 @@ func (e *ensureRunningWorkflowState) CanReconcile(workflow *operatorapi.SonataFl
 func (e *ensureRunningWorkflowState) Do(ctx context.Context, workflow *operatorapi.SonataFlow) (ctrl.Result, []client.Object, error) {
 	var objs []client.Object
 
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do 1")
+
 	flowDefCM, _, err := e.ensurers.definitionConfigMap.Ensure(ctx, workflow, ensureWorkflowDefConfigMapMutator(workflow))
 	if err != nil {
+		fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do ensurers.definitionConfigMap.Ensure failed: " + err.Error())
+
 		return ctrl.Result{Requeue: false}, objs, err
 	}
 	objs = append(objs, flowDefCM)
+
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do 2")
 
 	devBaseContainerImage := workflowdef.GetDefaultWorkflowDevModeImageTag()
 	// check if the Platform available
@@ -74,68 +81,112 @@ func (e *ensureRunningWorkflowState) Do(ctx context.Context, workflow *operatora
 	if err == nil && len(pl.Spec.DevMode.BaseImage) > 0 {
 		devBaseContainerImage = pl.Spec.DevMode.BaseImage
 	}
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do 3")
 	userPropsCM, _, err := e.ensurers.userPropsConfigMap.Ensure(ctx, workflow)
 	if err != nil {
+		fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do ensurers.userPropsConfigMap.Ensure failed: " + err.Error())
 		return ctrl.Result{Requeue: false}, objs, err
 	}
+
 	managedPropsCM, _, err := e.ensurers.managedPropsConfigMap.Ensure(ctx, workflow, pl, common.ManagedPropertiesMutateVisitor(ctx, e.StateSupport.Catalog, workflow, pl, userPropsCM.(*corev1.ConfigMap)))
 	if err != nil {
+		fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do ensurers.managedPropsConfigMap.Ensure failed: " + err.Error())
+
 		return ctrl.Result{Requeue: false}, objs, err
 	}
 	objs = append(objs, managedPropsCM)
 
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do 4")
 	externalCM, err := workflowdef.FetchExternalResourcesConfigMapsRef(e.C, workflow)
 	if err != nil {
+		fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do workflowdef.FetchExternalResourcesConfigMapsRef failed: " + err.Error())
+
 		workflow.Status.Manager().MarkFalse(api.RunningConditionType, api.ExternalResourcesNotFoundReason, "External Resources ConfigMap not found: %s", err.Error())
 		if _, err = e.PerformStatusUpdate(ctx, workflow); err != nil {
+
+			fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do  workflowdef.FetchExternalResourcesConfigMapsRef PerformStatusUpdate failed: " + err.Error())
+
 			return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, objs, err
 		}
+		fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do workflowdef.FetchExternalResourcesConfigMapsRef PerformStatusUpdate Ok!")
+
 		return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, objs, nil
 	}
+
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do 5")
+
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do  before deployment ensurers")
 
 	deployment, _, err := e.ensurers.deployment.Ensure(ctx, workflow,
 		deploymentMutateVisitor(workflow),
 		common.ImageDeploymentMutateVisitor(workflow, devBaseContainerImage),
 		mountDevConfigMapsMutateVisitor(workflow, flowDefCM.(*corev1.ConfigMap), userPropsCM.(*corev1.ConfigMap), managedPropsCM.(*corev1.ConfigMap), externalCM))
 	if err != nil {
+		fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do deployment ensurers failed: " + err.Error())
 		return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, objs, err
 	}
 	objs = append(objs, deployment)
 
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do   after deployment ensurers")
+
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do   before service ensurers")
+
 	service, _, err := e.ensurers.service.Ensure(ctx, workflow, common.ServiceMutateVisitor(workflow))
 	if err != nil {
+		fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do service ensurers failed: " + err.Error())
 		return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, objs, err
 	}
 	objs = append(objs, service)
 
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do   after service ensurers")
+
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do   before network ensurers")
+
 	route, _, err := e.ensurers.network.Ensure(ctx, workflow)
 	if err != nil {
+		fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do   network ensurers failed: " + err.Error())
 		return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, objs, err
 	}
 	objs = append(objs, route)
 
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do   after network ensurers")
+
 	// First time reconciling this object, mark as wait for deployment
 	if workflow.Status.GetTopLevelCondition().IsUnknown() {
+
+		fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do   first time reconcilling this object")
+
 		klog.V(log.I).InfoS("Workflow is in WaitingForDeployment Condition")
 		workflow.Status.Manager().MarkFalse(api.RunningConditionType, api.WaitingForDeploymentReason, "")
 		if _, err = e.PerformStatusUpdate(ctx, workflow); err != nil {
+			fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do   first time reconcilling this object, perform status update failed: " + err.Error())
+
 			return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, objs, err
 		}
+		fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do   first time reconcilling this object ok! and returning")
+
 		return ctrl.Result{RequeueAfter: constants.RequeueAfterIsRunning}, objs, nil
 	}
 
 	// Is the deployment still available?
+
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do   Is deployment still available?")
 	convertedDeployment := deployment.(*appsv1.Deployment)
 	if !kubeutil.IsDeploymentAvailable(convertedDeployment) {
+		fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do   Is deployment NOT available, attempt to recover")
+
 		klog.V(log.I).InfoS("Workflow is not running due to a problem in the Deployment. Attempt to recover.")
 		workflow.Status.Manager().MarkFalse(api.RunningConditionType,
 			api.DeploymentUnavailableReason,
 			common.GetDeploymentUnavailabilityMessage(convertedDeployment))
 		if _, err = e.PerformStatusUpdate(ctx, workflow); err != nil {
+			fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do   Is deployment NOT available, attempt to recover failed: " + err.Error())
+
 			return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, objs, err
 		}
 	}
 
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do   RequeueAfterIsRunning case!")
 	return ctrl.Result{RequeueAfter: constants.RequeueAfterIsRunning}, objs, nil
 }
 
@@ -154,32 +205,59 @@ func (f *followWorkflowDeploymentState) CanReconcile(workflow *operatorapi.Sonat
 }
 
 func (f *followWorkflowDeploymentState) Do(ctx context.Context, workflow *operatorapi.SonataFlow) (ctrl.Result, []client.Object, error) {
+
+	fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.Do 1")
+
+	fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.Do before SyncDeploymentStatus")
 	result, err := common.DeploymentManager(f.C).SyncDeploymentStatus(ctx, workflow)
 	if err != nil {
+		fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.Do SyncDeploymentStatus failed: " + err.Error())
+		return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, nil, err
+	}
+	fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.Do after SyncDeploymentStatus")
+
+	fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.Do before PerformStatusUpdate")
+	if _, err := f.PerformStatusUpdate(ctx, workflow); err != nil {
+		fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.Do PerformStatusUpdate failed: " + err.Error())
+
 		return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, nil, err
 	}
 
-	if _, err := f.PerformStatusUpdate(ctx, workflow); err != nil {
-		return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, nil, err
-	}
+	fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.Do after PerformStatusUpdate")
 
 	return result, nil, nil
 }
 
 func (f *followWorkflowDeploymentState) PostReconcile(ctx context.Context, workflow *operatorapi.SonataFlow) error {
+
+	fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.PostReconcile 1")
+
 	deployment := &appsv1.Deployment{}
 	if err := f.C.Get(ctx, client.ObjectKeyFromObject(workflow), deployment); err != nil {
+		fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.PostReconcile.ObjectKeyFromObject failed: " + err.Error())
 		return err
 	}
 	if deployment != nil && kubeutil.IsDeploymentAvailable(deployment) {
 		// Enriching Workflow CR status with needed network info
+		fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.PostReconcile.IsDeploymentAvailable true!")
+
+		fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.PostReconcile before networkInfo.Enrich")
 		if _, err := f.enrichers.networkInfo.Enrich(ctx, workflow); err != nil {
+			fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.PostReconcile  networkInfo.Enrich failed: " + err.Error())
 			return err
 		}
+		fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.PostReconcile after networkInfo.Enrich")
+
+		fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.PostReconcile before PerformStatusUpdate")
+
 		if _, err := f.PerformStatusUpdate(ctx, workflow); err != nil {
+			fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.PostReconcile PerformStatusUpdate failed: " + err.Error())
 			return err
 		}
+		fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.PostReconcile after PerformStatusUpdate")
 	}
+	fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.PostReconcile deployment not found")
+
 	return nil
 }
 
