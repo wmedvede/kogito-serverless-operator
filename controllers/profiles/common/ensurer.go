@@ -21,6 +21,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/apache/incubator-kie-kogito-serverless-operator/log"
 	"k8s.io/klog/v2"
@@ -78,6 +79,7 @@ func (d *defaultObjectEnsurer) Ensure(ctx context.Context, workflow *operatorapi
 
 	object, err := d.creator(workflow)
 	if err != nil {
+		fmt.Println(fmt.Sprintf(" ensurer.go defaultObjectEnsurer.Ensure creator failed for workflow: %s, object: (%s, %s), error: %s", workflow.Name, object.GetObjectKind().GroupVersionKind().String(), object.GetName(), err.Error()))
 		return nil, result, err
 	}
 	if result, err = controllerutil.CreateOrPatch(ctx, d.c, object,
@@ -89,8 +91,11 @@ func (d *defaultObjectEnsurer) Ensure(ctx context.Context, workflow *operatorapi
 			}
 			return controllerutil.SetControllerReference(workflow, object, d.c.Scheme())
 		}); err != nil {
+		fmt.Println(fmt.Sprintf(" ensurer.go defaultObjectEnsurer.Ensure CreateOrPatch failed for workflow: %s, object: (%s, %s), error: %s", workflow.Name, object.GetObjectKind().GroupVersionKind().String(), object.GetName(), err.Error()))
 		return nil, result, err
 	}
+
+	fmt.Println(fmt.Sprintf(" ensurer.go defaultObjectEnsurer.Ensure result successful for workflow: %s, object: (%s, %s), result: %s", workflow.Name, object.GetObjectKind().GroupVersionKind().String(), object.GetName(), result))
 	klog.V(log.I).InfoS("Object operation finalized", "result", result, "kind", object.GetObjectKind().GroupVersionKind().String(), "name", object.GetName(), "namespace", object.GetNamespace())
 	return object, result, nil
 }

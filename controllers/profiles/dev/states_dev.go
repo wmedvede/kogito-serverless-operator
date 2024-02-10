@@ -22,6 +22,7 @@ package dev
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -65,12 +66,16 @@ func (e *ensureRunningWorkflowState) Do(ctx context.Context, workflow *operatora
 
 	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do 1")
 
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do before ensurers.definitionConfigMap.Ensure")
+
 	flowDefCM, _, err := e.ensurers.definitionConfigMap.Ensure(ctx, workflow, ensureWorkflowDefConfigMapMutator(workflow))
 	if err != nil {
 		fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do ensurers.definitionConfigMap.Ensure failed: " + err.Error())
 
 		return ctrl.Result{Requeue: false}, objs, err
 	}
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do after ensurers.definitionConfigMap.Ensure")
+
 	objs = append(objs, flowDefCM)
 
 	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do 2")
@@ -78,10 +83,15 @@ func (e *ensureRunningWorkflowState) Do(ctx context.Context, workflow *operatora
 	devBaseContainerImage := workflowdef.GetDefaultWorkflowDevModeImageTag()
 	// check if the Platform available
 	pl, err := platform.GetActivePlatform(ctx, e.C, workflow.Namespace)
+	if err != nil {
+		fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do NO active plaform, me la pela. err: " + err.Error())
+	}
 	if err == nil && len(pl.Spec.DevMode.BaseImage) > 0 {
 		devBaseContainerImage = pl.Spec.DevMode.BaseImage
 	}
 	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do 3")
+
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do before ensurers.userPropsConfigMap.Ensure")
 	userPropsCM, _, err := e.ensurers.userPropsConfigMap.Ensure(ctx, workflow)
 	if err != nil {
 		fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do ensurers.userPropsConfigMap.Ensure failed: " + err.Error())
@@ -237,7 +247,9 @@ func (f *followWorkflowDeploymentState) PostReconcile(ctx context.Context, workf
 		fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.PostReconcile.ObjectKeyFromObject failed: " + err.Error())
 		return err
 	}
+	available := false
 	if deployment != nil && kubeutil.IsDeploymentAvailable(deployment) {
+		available = true
 		// Enriching Workflow CR status with needed network info
 		fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.PostReconcile.IsDeploymentAvailable true!")
 
@@ -256,7 +268,8 @@ func (f *followWorkflowDeploymentState) PostReconcile(ctx context.Context, workf
 		}
 		fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.PostReconcile after PerformStatusUpdate")
 	}
-	fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.PostReconcile deployment not found")
+
+	fmt.Println("XXXX states_dev.go *followWorkflowDeploymentState.PostReconcile exit with no errors, deployment available: " + strconv.FormatBool(available))
 
 	return nil
 }
@@ -270,68 +283,108 @@ func (r *recoverFromFailureState) CanReconcile(workflow *operatorapi.SonataFlow)
 }
 
 func (r *recoverFromFailureState) Do(ctx context.Context, workflow *operatorapi.SonataFlow) (ctrl.Result, []client.Object, error) {
+
+	fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do 1")
+
 	// for now, a very basic attempt to recover by rolling out the deployment
 	deployment := &appsv1.Deployment{}
 	if err := r.C.Get(ctx, client.ObjectKeyFromObject(workflow), deployment); err != nil {
 		// if the deployment is not there, let's try to reset the status condition and make the reconciliation fix the objects
+		fmt.Println("XXXX states_dev.go *recoverFromFailureState read deployment failure: " + err.Error())
+
 		if errors.IsNotFound(err) {
+			fmt.Println("XXXX states_dev.go *recoverFromFailureState deployment was not found, try to update workflow status")
+
 			klog.V(log.I).InfoS("Tried to recover from failed state, no deployment found, trying to reset the workflow conditions")
 			workflow.Status.RecoverFailureAttempts = 0
 			workflow.Status.Manager().MarkUnknown(api.RunningConditionType, "", "")
 			if _, updateErr := r.PerformStatusUpdate(ctx, workflow); updateErr != nil {
+				fmt.Println("XXXX states_dev.go *recoverFromFailureState deployment was not found, updated workflow status failed: " + updateErr.Error())
 				return ctrl.Result{Requeue: false}, nil, updateErr
 			}
+			fmt.Println("XXXX states_dev.go *recoverFromFailureState deployment was not found, requeue after failure.")
+
 			return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, nil, nil
 		}
+		fmt.Println("XXXX states_dev.go *recoverFromFailureState deployment was not found, requeue with false")
+
 		return ctrl.Result{Requeue: false}, nil, err
 	}
 
+	fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, before check if deployment is available")
+
 	// if the deployment is progressing we might have good news
 	if kubeutil.IsDeploymentAvailable(deployment) {
+		fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, deployment is available!")
+
+		fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, try to update workflow status to api.RunningConditionType = true")
 		workflow.Status.RecoverFailureAttempts = 0
 		workflow.Status.Manager().MarkTrue(api.RunningConditionType)
 		if _, updateErr := r.PerformStatusUpdate(ctx, workflow); updateErr != nil {
+			fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, try to update workflow status to api.RunningConditionType = true failed: " + updateErr.Error())
 			return ctrl.Result{Requeue: false}, nil, updateErr
 		}
+		fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, try to update workflow status to api.RunningConditionType = true updated ok!, requeue")
+
 		return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, nil, nil
 	}
+
+	fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, before check  workflow.Status.RecoverFailureAttempts")
 
 	if workflow.Status.RecoverFailureAttempts >= constants.RecoverDeploymentErrorRetries {
 		workflow.Status.Manager().MarkFalse(api.RunningConditionType, api.RedeploymentExhaustedReason,
 			"Can't recover workflow from failure after maximum attempts: %d", workflow.Status.RecoverFailureAttempts)
 		if _, updateErr := r.PerformStatusUpdate(ctx, workflow); updateErr != nil {
+			fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, check  workflow.Status.RecoverFailureAttempts failed: " + updateErr.Error())
+
 			return ctrl.Result{}, nil, updateErr
 		}
 		return ctrl.Result{RequeueAfter: constants.RequeueRecoverDeploymentErrorInterval}, nil, nil
 	}
 
+	fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, after  workflow.Status.RecoverFailureAttempts")
+
 	// TODO: we can improve deployment failures https://issues.redhat.com/browse/KOGITO-8812
+
+	fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, Guard to avoid consecutive reconciliations to mess with the recover interval")
 
 	// Guard to avoid consecutive reconciliations to mess with the recover interval
 	if !workflow.Status.LastTimeRecoverAttempt.IsZero() &&
 		metav1.Now().Sub(workflow.Status.LastTimeRecoverAttempt.Time).Minutes() > 10 {
+		fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, Guard to avoid consecutive reconciliations to mess with the recover interval, requeue in 10 mins")
 		return ctrl.Result{RequeueAfter: time.Minute * constants.RecoverDeploymentErrorInterval}, nil, nil
 	}
 
 	// let's try rolling out the deployment
+	fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, before mark deployment to rollout")
 	if err := kubeutil.MarkDeploymentToRollout(deployment); err != nil {
+		fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, mark deployment to rollout failed: " + err.Error())
 		return ctrl.Result{}, nil, err
 	}
+	fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, after mark deployment to rollout")
+
+	fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, before retry.RetryOnConflict")
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		updateErr := r.C.Update(ctx, deployment)
+		fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, retry.RetryOnConflict updateErr: " + updateErr.Error())
 		return updateErr
 	})
 
 	if retryErr != nil {
+		fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, before retry.RetryOnConflict failed, retryErr: " + retryErr.Error())
+
 		klog.V(log.E).ErrorS(retryErr, "Error during Deployment rollout")
 		return ctrl.Result{RequeueAfter: constants.RequeueRecoverDeploymentErrorInterval}, nil, nil
 	}
 
+	fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, before workflow.Status.RecoverFailureAttempts increase")
 	workflow.Status.RecoverFailureAttempts += 1
 	workflow.Status.LastTimeRecoverAttempt = metav1.Now()
 	if _, err := r.PerformStatusUpdate(ctx, workflow); err != nil {
+		fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, workflow.Status.RecoverFailureAttempts increase failed: " + err.Error())
 		return ctrl.Result{Requeue: false}, nil, err
 	}
+	fmt.Println("XXXX states_dev.go *recoverFromFailureState.Do, exit with constants.RequeueRecoverDeploymentErrorInterval")
 	return ctrl.Result{RequeueAfter: constants.RequeueRecoverDeploymentErrorInterval}, nil, nil
 }
 

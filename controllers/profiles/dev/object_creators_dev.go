@@ -21,6 +21,7 @@ package dev
 
 import (
 	"fmt"
+
 	"path"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -77,6 +78,12 @@ func deploymentCreator(workflow *operatorapi.SonataFlow) (client.Object, error) 
 		deployment.Spec.Template.Spec.Containers[idx].ReadinessProbe.FailureThreshold = healthFailureThresholdDevMode
 	}
 	fmt.Println("XXXX object_creators_dev.go final created deployment: " + deployment.String())
+
+	//marshalled, err := yaml.Marshal(deployment)
+	//deploymentAsString := string(marshalled)
+
+	//fmt.Println("XXXX object_creators_dev.go final created deploymentAsString: " + deploymentAsString)
+
 	return deployment, nil
 }
 
