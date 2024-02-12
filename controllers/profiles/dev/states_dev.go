@@ -22,6 +22,7 @@ package dev
 import (
 	"context"
 	"fmt"
+	"sigs.k8s.io/yaml"
 	"strconv"
 	"time"
 
@@ -135,6 +136,10 @@ func (e *ensureRunningWorkflowState) Do(ctx context.Context, workflow *operatora
 		fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do deployment ensurers failed: " + err.Error())
 		return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, objs, err
 	}
+	marshalled, err := yaml.Marshal(deployment)
+	deploymentAsString := string(marshalled)
+	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do deployment just created after ensurers deploymentAsString: " + deploymentAsString)
+
 	objs = append(objs, deployment)
 
 	fmt.Println("XXXX states_dev.go *ensureRunningWorkflowState.Do   after deployment ensurers")

@@ -21,6 +21,7 @@ package dev
 
 import (
 	"fmt"
+	"sigs.k8s.io/yaml"
 
 	"path"
 
@@ -79,10 +80,10 @@ func deploymentCreator(workflow *operatorapi.SonataFlow) (client.Object, error) 
 	}
 	fmt.Println("XXXX object_creators_dev.go final created deployment: " + deployment.String())
 
-	//marshalled, err := yaml.Marshal(deployment)
-	//deploymentAsString := string(marshalled)
+	marshalled, err := yaml.Marshal(deployment)
+	deploymentAsString := string(marshalled)
 
-	//fmt.Println("XXXX object_creators_dev.go final created deploymentAsString: " + deploymentAsString)
+	fmt.Println("XXXX object_creators_dev.go final created deploymentAsString: " + deploymentAsString)
 
 	return deployment, nil
 }
@@ -171,7 +172,7 @@ func mountDevConfigMapsMutateVisitor(workflow *operatorapi.SonataFlow, flowDefCM
 			}
 
 			if len(deployment.Spec.Template.Spec.Volumes) == 0 {
-				deployment.Spec.Template.Spec.Volumes = make([]corev1.Volume, 0, len(resourceVolumes)+2)
+				deployment.Spec.Template.Spec.Volumes = make([]corev1.Volume, 0, len(resourceVolumes)+1)
 			}
 			kubeutil.AddOrReplaceVolume(&deployment.Spec.Template.Spec, defaultResourcesVolume)
 			kubeutil.AddOrReplaceVolume(&deployment.Spec.Template.Spec, resourceVolumes...)

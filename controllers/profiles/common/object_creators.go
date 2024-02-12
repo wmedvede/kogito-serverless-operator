@@ -132,38 +132,46 @@ func defaultContainer(workflow *operatorapi.SonataFlow) (*corev1.Container, erro
 		Protocol:      corev1.ProtocolTCP,
 	}
 	defaultFlowContainer := &corev1.Container{
-		Name:                     operatorapi.DefaultContainerName,
-		Ports:                    []corev1.ContainerPort{defaultContainerPort},
-		TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
+		Name:  operatorapi.DefaultContainerName,
+		Ports: []corev1.ContainerPort{defaultContainerPort},
+		//TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
 		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Path: QuarkusHealthPathLive,
-					Port: DefaultHTTPWorkflowPortIntStr,
+					Path:   QuarkusHealthPathLive,
+					Port:   DefaultHTTPWorkflowPortIntStr,
+					Scheme: "HTTP",
 				},
 			},
-			TimeoutSeconds: healthTimeoutSeconds,
+			PeriodSeconds:    11,
+			SuccessThreshold: 1,
+			TimeoutSeconds:   healthTimeoutSeconds,
 		},
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Path: QuarkusHealthPathReady,
-					Port: DefaultHTTPWorkflowPortIntStr,
+					Path:   QuarkusHealthPathReady,
+					Port:   DefaultHTTPWorkflowPortIntStr,
+					Scheme: "HTTP",
 				},
 			},
-			TimeoutSeconds: healthTimeoutSeconds,
+			PeriodSeconds:    11,
+			SuccessThreshold: 1,
+			TimeoutSeconds:   healthTimeoutSeconds,
 		},
 		StartupProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Path: quarkusHealthPathStarted,
-					Port: DefaultHTTPWorkflowPortIntStr,
+					Path:   quarkusHealthPathStarted,
+					Port:   DefaultHTTPWorkflowPortIntStr,
+					Scheme: "HTTP",
 				},
 			},
 			InitialDelaySeconds: healthStartedInitialDelaySeconds,
 			TimeoutSeconds:      healthTimeoutSeconds,
 			FailureThreshold:    healthStartedFailureThreshold,
 			PeriodSeconds:       healthStartedPeriodSeconds,
+			SuccessThreshold:    1,
 		},
 		SecurityContext: kubeutil.SecurityDefaults(),
 	}

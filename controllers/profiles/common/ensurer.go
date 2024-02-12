@@ -22,6 +22,8 @@ package common
 import (
 	"context"
 	"fmt"
+	"sigs.k8s.io/yaml"
+	"strconv"
 
 	"github.com/apache/incubator-kie-kogito-serverless-operator/log"
 	"k8s.io/klog/v2"
@@ -78,22 +80,37 @@ func (d *defaultObjectEnsurer) Ensure(ctx context.Context, workflow *operatorapi
 	result := controllerutil.OperationResultNone
 
 	object, err := d.creator(workflow)
+
+	marshalled, err := yaml.Marshal(object)
+	objectAsString := string(marshalled)
+
+	fmt.Println(fmt.Sprintf(" ensurer.go defaultObjectEnsurer.Ensure, created object for workflow: workflow: %s, object: (%s, %s), objectAsString: %s", workflow.Name, object.GetObjectKind().GroupVersionKind().String(), object.GetName(), objectAsString))
+
 	if err != nil {
 		fmt.Println(fmt.Sprintf(" ensurer.go defaultObjectEnsurer.Ensure creator failed for workflow: %s, object: (%s, %s), error: %s", workflow.Name, object.GetObjectKind().GroupVersionKind().String(), object.GetName(), err.Error()))
 		return nil, result, err
 	}
 	if result, err = controllerutil.CreateOrPatch(ctx, d.c, object,
 		func() error {
-			for _, v := range visitors {
+			for i, v := range visitors {
+				fmt.Println(fmt.Sprintf(" ensurer.go defaultObjectEnsurer.Ensure, applying visitor %s", strconv.Itoa(i)))
+
 				if visitorErr := v(object)(); visitorErr != nil {
 					return visitorErr
 				}
 			}
+			marshalled2, _ := yaml.Marshal(object)
+			objectAsString2 := string(marshalled2)
+			fmt.Println(fmt.Sprintf(" ensurer.go defaultObjectEnsurer.Ensure, created object after applying all the visitors: workflow: %s, object: (%s, %s), objectAsString: %s", workflow.Name, object.GetObjectKind().GroupVersionKind().String(), object.GetName(), objectAsString2))
 			return controllerutil.SetControllerReference(workflow, object, d.c.Scheme())
 		}); err != nil {
 		fmt.Println(fmt.Sprintf(" ensurer.go defaultObjectEnsurer.Ensure CreateOrPatch failed for workflow: %s, object: (%s, %s), error: %s", workflow.Name, object.GetObjectKind().GroupVersionKind().String(), object.GetName(), err.Error()))
 		return nil, result, err
 	}
+
+	marshalled, err = yaml.Marshal(object)
+	objectAsString = string(marshalled)
+	fmt.Println(fmt.Sprintf(" ensurer.go defaultObjectEnsurer.Ensure, created or patched object after CreateOrPatch exectution for workflow: workflow: %s, object: (%s, %s), objectAsString: %s", workflow.Name, object.GetObjectKind().GroupVersionKind().String(), object.GetName(), objectAsString))
 
 	fmt.Println(fmt.Sprintf(" ensurer.go defaultObjectEnsurer.Ensure result successful for workflow: %s, object: (%s, %s), result: %s", workflow.Name, object.GetObjectKind().GroupVersionKind().String(), object.GetName(), result))
 	klog.V(log.I).InfoS("Object operation finalized", "result", result, "kind", object.GetObjectKind().GroupVersionKind().String(), "name", object.GetName(), "namespace", object.GetNamespace())
