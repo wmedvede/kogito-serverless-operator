@@ -15,7 +15,7 @@
       container:
         image_build_method: imagebuilder
         remote_source:
-          repo: https://github.com/apache/incubator-kie-kogito-serverless-operator
+          repo: https://github.com/kiegroup/kogito-serverless-operator
           ref: 078cef15b1860d0c52fc1fd479a37d43819f09a3
           pkg_managers:
             - gomod
@@ -25,7 +25,7 @@
             - ppc64le
             - aarch64
 
-- name: "openshift-serverless-1-tech-preview/logic-operator-rhel8"
+- name: "openshift-serverless-1-tech-preview/logic-rhel8-operator"
   version: "1.30.0"
   from: "registry.access.redhat.com/ubi8/ubi-micro:latest"
   description: "Runtime Image for the Red Hat OpenShift Serverless Logic Operator"
