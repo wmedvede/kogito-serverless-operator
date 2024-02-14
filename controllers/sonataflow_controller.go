@@ -74,7 +74,7 @@ func (r *SonataFlowReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if ok, err := platform.IsOperatorAllowedOnNamespace(ctx, r.Client, req.Namespace); err != nil {
 		return reconcile.Result{}, err
 	} else if !ok {
-		klog.V(log.I).InfoS("Ignoring request because the operator hasn't got the permissions to work on namespace", "namespace", req.Namespace)
+		klog.V(log.I).InfoS("Simple modification here to test the CI build Ignoring request because the operator hasn't got the permissions to work on namespace", "namespace", req.Namespace)
 		return reconcile.Result{}, nil
 	}
 
