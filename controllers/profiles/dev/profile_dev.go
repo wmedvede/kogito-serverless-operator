@@ -20,13 +20,13 @@
 package dev
 
 import (
+	"github.com/apache/incubator-kie-kogito-serverless-operator/api/metadata"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apache/incubator-kie-kogito-serverless-operator/api/metadata"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/log"
@@ -46,6 +46,7 @@ func (d developmentProfile) GetProfile() metadata.ProfileType {
 func NewProfileReconciler(client client.Client, cfg *rest.Config, recorder record.EventRecorder) profiles.ProfileReconciler {
 	support := &common.StateSupport{
 		C:        client,
+		Cfg:      cfg,
 		Catalog:  discovery.NewServiceCatalogForConfig(client, cfg),
 		Recorder: recorder,
 	}
@@ -75,7 +76,7 @@ func NewProfileReconciler(client client.Client, cfg *rest.Config, recorder recor
 
 func newObjectEnsurers(support *common.StateSupport) *objectEnsurers {
 	return &objectEnsurers{
-		deployment:            common.NewObjectEnsurer(support.C, deploymentCreator),
+		deployment:            common.NewObjectEnsurerWithPlatform(support.C, deploymentCreator),
 		service:               common.NewObjectEnsurer(support.C, serviceCreator),
 		network:               common.NewNoopObjectEnsurer(),
 		definitionConfigMap:   common.NewObjectEnsurer(support.C, workflowDefConfigMapCreator),
@@ -86,7 +87,7 @@ func newObjectEnsurers(support *common.StateSupport) *objectEnsurers {
 
 func newObjectEnsurersOpenShift(support *common.StateSupport) *objectEnsurers {
 	return &objectEnsurers{
-		deployment:            common.NewObjectEnsurer(support.C, deploymentCreator),
+		deployment:            common.NewObjectEnsurerWithPlatform(support.C, deploymentCreator),
 		service:               common.NewObjectEnsurer(support.C, serviceCreator),
 		network:               common.NewObjectEnsurer(support.C, common.OpenShiftRouteCreator),
 		definitionConfigMap:   common.NewObjectEnsurer(support.C, workflowDefConfigMapCreator),
@@ -108,7 +109,7 @@ func newStatusEnrichersOpenShift(support *common.StateSupport) *statusEnrichers 
 }
 
 type objectEnsurers struct {
-	deployment            common.ObjectEnsurer
+	deployment            common.ObjectEnsurerWithPlatform
 	service               common.ObjectEnsurer
 	network               common.ObjectEnsurer
 	definitionConfigMap   common.ObjectEnsurer

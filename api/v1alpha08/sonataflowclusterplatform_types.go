@@ -28,8 +28,22 @@ const (
 
 // SonataFlowClusterPlatformSpec defines the desired state of SonataFlowClusterPlatform
 type SonataFlowClusterPlatformSpec struct {
+	// PlatformRef defines which existing SonataFlowPlatform's supporting services should be used cluster-wide.
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="PlatformRef"
 	PlatformRef SonataFlowPlatformRef `json:"platformRef"`
+	// Capabilities defines which platform capabilities should be applied cluster-wide. If nil, defaults to `capabilities.workflows["services"]`
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Capabilities"
+	Capabilities *SonataFlowClusterPlatformCapSpec `json:"capabilities,omitempty"`
 }
+
+// SonataFlowClusterPlatformCapSpec defines which platform capabilities should be applied cluster-wide
+type SonataFlowClusterPlatformCapSpec struct {
+	// Workflows defines which platform capabilities should be applied to workflows cluster-wide.
+	Workflows []WorkFlowCapability `json:"workflows,omitempty"`
+}
+
+// +kubebuilder:validation:Enum=services
+type WorkFlowCapability string
 
 // SonataFlowPlatformRef defines which existing SonataFlowPlatform's supporting services should be used cluster-wide.
 type SonataFlowPlatformRef struct {
@@ -78,6 +92,7 @@ func (in *SonataFlowClusterPlatformStatus) IsDuplicated() bool {
 // +kubebuilder:printcolumn:name="Platform_NS",type=string,JSONPath=`.spec.platformRef.namespace`
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=`.status.conditions[?(@.type=='Succeed')].status`
 // +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.conditions[?(@.type=='Succeed')].reason`
+// +operator-sdk:csv:customresourcedefinitions:resources={{SonataFlowPlatform,sonataflow.org/v1alpha08,"A SonataFlow Platform"}}
 type SonataFlowClusterPlatform struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

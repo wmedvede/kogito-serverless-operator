@@ -22,13 +22,13 @@ package dev
 import (
 	"path"
 
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	operatorapi "github.com/apache/incubator-kie-kogito-serverless-operator/api/v1alpha08"
-	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/workflowdef"
 	kubeutil "github.com/apache/incubator-kie-kogito-serverless-operator/utils/kubernetes"
@@ -54,8 +54,9 @@ func serviceCreator(workflow *operatorapi.SonataFlow) (client.Object, error) {
 	return service, nil
 }
 
-func deploymentCreator(workflow *operatorapi.SonataFlow) (client.Object, error) {
-	obj, err := common.DeploymentCreator(workflow)
+func deploymentCreator(workflow *operatorapi.SonataFlow, plf *operatorapi.SonataFlowPlatform) (client.Object, error) {
+
+	obj, err := common.DeploymentCreator(workflow, plf)
 	if err != nil {
 		return nil, err
 	}
@@ -84,13 +85,13 @@ func workflowDefConfigMapCreator(workflow *operatorapi.SonataFlow) (client.Objec
 }
 
 // deploymentMutateVisitor guarantees the state of the default Deployment object
-func deploymentMutateVisitor(workflow *operatorapi.SonataFlow) common.MutateVisitor {
+func deploymentMutateVisitor(workflow *operatorapi.SonataFlow, plf *operatorapi.SonataFlowPlatform) common.MutateVisitor {
 	return func(object client.Object) controllerutil.MutateFn {
 		return func() error {
 			if kubeutil.IsObjectNew(object) {
 				return nil
 			}
-			original, err := deploymentCreator(workflow)
+			original, err := deploymentCreator(workflow, plf)
 			if err != nil {
 				return err
 			}
@@ -150,7 +151,7 @@ func mountDevConfigMapsMutateVisitor(workflow *operatorapi.SonataFlow, flowDefCM
 			}
 
 			if len(deployment.Spec.Template.Spec.Volumes) == 0 {
-				deployment.Spec.Template.Spec.Volumes = make([]corev1.Volume, 0, len(resourceVolumes)+2)
+				deployment.Spec.Template.Spec.Volumes = make([]corev1.Volume, 0, len(resourceVolumes)+1)
 			}
 			kubeutil.AddOrReplaceVolume(&deployment.Spec.Template.Spec, defaultResourcesVolume)
 			kubeutil.AddOrReplaceVolume(&deployment.Spec.Template.Spec, resourceVolumes...)

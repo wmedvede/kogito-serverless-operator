@@ -20,17 +20,28 @@
 package common
 
 import (
+	"fmt"
+	"strings"
+
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/workflowdef"
+
+	cncfmodel "github.com/serverlessworkflow/sdk-go/v2/model"
+
 	"github.com/imdario/mergo"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	eventingv1 "knative.dev/eventing/pkg/apis/eventing/v1"
+	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
+	duckv1 "knative.dev/pkg/apis/duck/v1"
+	"knative.dev/pkg/tracker"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	operatorapi "github.com/apache/incubator-kie-kogito-serverless-operator/api/v1alpha08"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/constants"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/persistence"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/properties"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/variables"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/utils"
 	kubeutil "github.com/apache/incubator-kie-kogito-serverless-operator/utils/kubernetes"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/utils/openshift"
@@ -45,15 +56,11 @@ type ObjectCreator func(workflow *operatorapi.SonataFlow) (client.Object, error)
 // SonataFlowPlatform
 type ObjectCreatorWithPlatform func(workflow *operatorapi.SonataFlow, platform *operatorapi.SonataFlowPlatform) (client.Object, error)
 
+// ObjectsCreator creates multiple resources
+type ObjectsCreator func(workflow *operatorapi.SonataFlow) ([]client.Object, error)
+
 const (
 	defaultHTTPServicePort = 80
-
-	// Quarkus Health Check Probe configuration.
-	// See: https://quarkus.io/guides/smallrye-health#running-the-health-check
-
-	quarkusHealthPathStarted = "/q/health/started"
-	QuarkusHealthPathReady   = "/q/health/ready"
-	QuarkusHealthPathLive    = "/q/health/live"
 
 	// Default deployment health check configuration
 	// See: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
@@ -65,13 +72,9 @@ const (
 	defaultSchemaName                = "default"
 )
 
-var (
-	DefaultHTTPWorkflowPortIntStr = intstr.FromInt(constants.DefaultHTTPWorkflowPortInt)
-)
-
 // DeploymentCreator is an objectCreator for a base Kubernetes Deployments for profiles that need to deploy the workflow on a vanilla deployment.
 // It serves as a basis for a basic Quarkus Java application, expected to listen on http 8080.
-func DeploymentCreator(workflow *operatorapi.SonataFlow) (client.Object, error) {
+func DeploymentCreator(workflow *operatorapi.SonataFlow, plf *operatorapi.SonataFlowPlatform) (client.Object, error) {
 	lbl := workflowproj.GetDefaultLabels(workflow)
 
 	deployment := &appsv1.Deployment{
@@ -97,8 +100,7 @@ func DeploymentCreator(workflow *operatorapi.SonataFlow) (client.Object, error) 
 	if err := mergo.Merge(&deployment.Spec.Template.Spec, workflow.Spec.PodTemplate.PodSpec.ToPodSpec(), mergo.WithOverride); err != nil {
 		return nil, err
 	}
-
-	flowContainer, err := defaultContainer(workflow)
+	flowContainer, err := defaultContainer(workflow, plf)
 	if err != nil {
 		return nil, err
 	}
@@ -115,9 +117,9 @@ func getReplicasOrDefault(workflow *operatorapi.SonataFlow) *int32 {
 	return workflow.Spec.PodTemplate.Replicas
 }
 
-func defaultContainer(workflow *operatorapi.SonataFlow) (*corev1.Container, error) {
+func defaultContainer(workflow *operatorapi.SonataFlow, plf *operatorapi.SonataFlowPlatform) (*corev1.Container, error) {
 	defaultContainerPort := corev1.ContainerPort{
-		ContainerPort: DefaultHTTPWorkflowPortIntStr.IntVal,
+		ContainerPort: variables.DefaultHTTPWorkflowPortIntStr.IntVal,
 		Name:          utils.HttpScheme,
 		Protocol:      corev1.ProtocolTCP,
 	}
@@ -128,8 +130,8 @@ func defaultContainer(workflow *operatorapi.SonataFlow) (*corev1.Container, erro
 		LivenessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Path: QuarkusHealthPathLive,
-					Port: DefaultHTTPWorkflowPortIntStr,
+					Path: constants.QuarkusHealthPathLive,
+					Port: variables.DefaultHTTPWorkflowPortIntStr,
 				},
 			},
 			TimeoutSeconds: healthTimeoutSeconds,
@@ -137,8 +139,8 @@ func defaultContainer(workflow *operatorapi.SonataFlow) (*corev1.Container, erro
 		ReadinessProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Path: QuarkusHealthPathReady,
-					Port: DefaultHTTPWorkflowPortIntStr,
+					Path: constants.QuarkusHealthPathReady,
+					Port: variables.DefaultHTTPWorkflowPortIntStr,
 				},
 			},
 			TimeoutSeconds: healthTimeoutSeconds,
@@ -146,8 +148,8 @@ func defaultContainer(workflow *operatorapi.SonataFlow) (*corev1.Container, erro
 		StartupProbe: &corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
-					Path: quarkusHealthPathStarted,
-					Port: DefaultHTTPWorkflowPortIntStr,
+					Path: constants.QuarkusHealthPathStarted,
+					Port: variables.DefaultHTTPWorkflowPortIntStr,
 				},
 			},
 			InitialDelaySeconds: healthStartedInitialDelaySeconds,
@@ -161,13 +163,19 @@ func defaultContainer(workflow *operatorapi.SonataFlow) (*corev1.Container, erro
 	if err := mergo.Merge(defaultFlowContainer, workflow.Spec.PodTemplate.Container.ToContainer(), mergo.WithOverride); err != nil {
 		return nil, err
 	}
-	defaultFlowContainer = ConfigurePersistence(defaultFlowContainer, workflow.Spec.Persistence, defaultSchemaName, workflow.Namespace)
+	var pper *operatorapi.PlatformPersistenceOptionsSpec
+	if plf != nil && plf.Spec.Persistence != nil {
+		pper = plf.Spec.Persistence
+	}
+	if p := persistence.RetrieveConfiguration(workflow.Spec.Persistence, pper, workflow.Name); p != nil {
+		defaultFlowContainer = persistence.ConfigurePersistence(defaultFlowContainer, p, workflow.Name, workflow.Namespace)
+	}
 	// immutable
 	defaultFlowContainer.Name = operatorapi.DefaultContainerName
 	portIdx := -1
 	for i := range defaultFlowContainer.Ports {
 		if defaultFlowContainer.Ports[i].Name == utils.HttpScheme ||
-			defaultFlowContainer.Ports[i].ContainerPort == DefaultHTTPWorkflowPortIntStr.IntVal {
+			defaultFlowContainer.Ports[i].ContainerPort == variables.DefaultHTTPWorkflowPortIntStr.IntVal {
 			portIdx = i
 			break
 		}
@@ -197,12 +205,91 @@ func ServiceCreator(workflow *operatorapi.SonataFlow) (client.Object, error) {
 			Ports: []corev1.ServicePort{{
 				Protocol:   corev1.ProtocolTCP,
 				Port:       defaultHTTPServicePort,
-				TargetPort: DefaultHTTPWorkflowPortIntStr,
+				TargetPort: variables.DefaultHTTPWorkflowPortIntStr,
 			}},
 		},
 	}
 
 	return service, nil
+}
+
+// SinkBindingCreator is an ObjectsCreator for SinkBinding.
+// It will create v1.SinkBinding based on events defined in workflow.
+func SinkBindingCreator(workflow *operatorapi.SonataFlow) (client.Object, error) {
+	lbl := workflowproj.GetDefaultLabels(workflow)
+
+	// skip if no produced event is found
+	if workflow.Spec.Sink == nil || !workflowdef.ContainsEventKind(workflow, cncfmodel.EventKindProduced) {
+		return nil, nil
+	}
+
+	sink := workflow.Spec.Sink
+
+	// subject must be deployment to inject K_SINK, service won't work
+	sinkBinding := &sourcesv1.SinkBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      strings.ToLower(fmt.Sprintf("%s-sb", workflow.Name)),
+			Namespace: workflow.Namespace,
+			Labels:    lbl,
+		},
+		Spec: sourcesv1.SinkBindingSpec{
+			SourceSpec: duckv1.SourceSpec{
+				Sink: *sink,
+			},
+			BindingSpec: duckv1.BindingSpec{
+				Subject: tracker.Reference{
+					Name:       workflow.Name,
+					Namespace:  workflow.Namespace,
+					APIVersion: "apps/v1",
+					Kind:       "Deployment",
+				},
+			},
+		},
+	}
+	return sinkBinding, nil
+}
+
+// TriggersCreator is an ObjectsCreator for Triggers.
+// It will create a list of eventingv1.Trigger based on events defined in workflow.
+func TriggersCreator(workflow *operatorapi.SonataFlow) ([]client.Object, error) {
+	var resultObjects []client.Object
+	lbl := workflowproj.GetDefaultLabels(workflow)
+
+	//consumed
+	events := workflow.Spec.Flow.Events
+	for _, event := range events {
+		// filter out produce events
+		if event.Kind == cncfmodel.EventKindProduced {
+			continue
+		}
+
+		// construct eventingv1.Trigger
+		trigger := &eventingv1.Trigger{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      strings.ToLower(fmt.Sprintf("%s-%s-trigger", workflow.Name, event.Name)),
+				Namespace: workflow.Namespace,
+				Labels:    lbl,
+			},
+			Spec: eventingv1.TriggerSpec{
+				Broker: constants.KnativeEventingBrokerDefault,
+				Filter: &eventingv1.TriggerFilter{
+					Attributes: eventingv1.TriggerFilterAttributes{
+						"type": event.Type,
+					},
+				},
+				Subscriber: duckv1.Destination{
+					Ref: &duckv1.KReference{
+						Name:       workflow.Name,
+						Namespace:  workflow.Namespace,
+						APIVersion: "v1",
+						Kind:       "Service",
+					},
+				},
+			},
+		}
+		resultObjects = append(resultObjects, trigger)
+	}
+	return resultObjects, nil
 }
 
 // OpenShiftRouteCreator is an ObjectCreator for a basic Route for a workflow running on OpenShift.
@@ -225,12 +312,4 @@ func ManagedPropsConfigMapCreator(workflow *operatorapi.SonataFlow, platform *op
 		return nil, err
 	}
 	return workflowproj.CreateNewManagedPropsConfigMap(workflow, props), nil
-}
-
-func ConfigurePersistence(serviceContainer *corev1.Container, options *operatorapi.PersistenceOptions, defaultSchema, namespace string) *corev1.Container {
-	c := serviceContainer.DeepCopy()
-	if options != nil && options.PostgreSql != nil {
-		c.Env = append(c.Env, persistence.ConfigurePostgreSqlEnv(options.PostgreSql, defaultSchema, namespace)...)
-	}
-	return c
 }

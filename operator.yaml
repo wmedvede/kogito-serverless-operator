@@ -413,8 +413,21 @@ spec:
             description: SonataFlowClusterPlatformSpec defines the desired state of
               SonataFlowClusterPlatform
             properties:
+              capabilities:
+                description: Capabilities defines which platform capabilities should
+                  be applied cluster-wide. If nil, defaults to `capabilities.workflows["services"]`
+                properties:
+                  workflows:
+                    description: Workflows defines which platform capabilities should
+                      be applied to workflows cluster-wide.
+                    items:
+                      enum:
+                      - services
+                      type: string
+                    type: array
+                type: object
               platformRef:
-                description: SonataFlowPlatformRef defines which existing SonataFlowPlatform's
+                description: PlatformRef defines which existing SonataFlowPlatform's
                   supporting services should be used cluster-wide.
                 properties:
                   name:
@@ -898,6 +911,63 @@ spec:
                     description: Base image to run the Workflow in dev mode instead
                       of the operator's default.
                     type: string
+                type: object
+              persistence:
+                description: Persistence defines the platform persistence configuration.
+                  When this field is set, the configuration is used as the persistence
+                  for platform services and sonataflow instances that don't provide
+                  one of their own.
+                maxProperties: 1
+                properties:
+                  postgresql:
+                    description: Connect configured services to a postgresql database.
+                    maxProperties: 2
+                    minProperties: 2
+                    properties:
+                      jdbcUrl:
+                        description: PostgreSql JDBC URL. Mutually exclusive to serviceRef.
+                          e.g. "jdbc:postgresql://host:port/database?currentSchema=data-index-service"
+                        type: string
+                      secretRef:
+                        description: Secret reference to the database user credentials
+                        properties:
+                          name:
+                            description: Name of the postgresql credentials secret.
+                            type: string
+                          passwordKey:
+                            description: Defaults to POSTGRESQL_PASSWORD
+                            type: string
+                          userKey:
+                            description: Defaults to POSTGRESQL_USER
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      serviceRef:
+                        description: Service reference to postgresql datasource. Mutually
+                          exclusive to jdbcUrl.
+                        properties:
+                          databaseName:
+                            description: Name of postgresql database to be used. Defaults
+                              to "sonataflow"
+                            type: string
+                          name:
+                            description: Name of the postgresql k8s service.
+                            type: string
+                          namespace:
+                            description: Namespace of the postgresql k8s service.
+                              Defaults to the SonataFlowPlatform's local namespace.
+                            type: string
+                          port:
+                            description: Port to use when connecting to the postgresql
+                              k8s service. Defaults to 5432.
+                            type: integer
+                        required:
+                        - name
+                        type: object
+                    required:
+                    - secretRef
+                    type: object
                 type: object
               services:
                 description: 'Services attributes for deploying supporting applications
@@ -18860,8 +18930,8 @@ spec:
                 - states
                 type: object
               persistence:
-                description: Persists service to a datasource of choice. Ephemeral
-                  by default.
+                description: Persistence defines the database persistence configuration
+                  for the workflow
                 maxProperties: 1
                 properties:
                   postgresql:
@@ -26103,6 +26173,53 @@ spec:
                       type: object
                     type: array
                 type: object
+              sink:
+                description: Sink describes the sinkBinding details of this SonataFlow
+                  instance.
+                properties:
+                  CACerts:
+                    description: CACerts are Certification Authority (CA) certificates
+                      in PEM format according to https://www.rfc-editor.org/rfc/rfc7468.
+                      If set, these CAs are appended to the set of CAs provided by
+                      the Addressable target, if any.
+                    type: string
+                  ref:
+                    description: Ref points to an Addressable.
+                    properties:
+                      address:
+                        description: Address points to a specific Address Name.
+                        type: string
+                      apiVersion:
+                        description: API version of the referent.
+                        type: string
+                      group:
+                        description: 'Group of the API, without the version of the
+                          group. This can be used as an alternative to the APIVersion,
+                          and then resolved using ResolveGroup. Note: This API is
+                          EXPERIMENTAL and might break anytime. For more details:
+                          https://github.com/knative/eventing/issues/5086'
+                        type: string
+                      kind:
+                        description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                        type: string
+                      name:
+                        description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                        type: string
+                      namespace:
+                        description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                          This is optional field, it gets defaulted to the object
+                          holding it if left out.'
+                        type: string
+                    required:
+                    - kind
+                    - name
+                    type: object
+                  uri:
+                    description: URI can be an absolute URL(non-empty scheme and non-empty
+                      host) pointing to the target or a relative URI. Relative URIs
+                      will be resolved using the base URI retrieved from Ref.
+                    type: string
+                type: object
             required:
             - flow
             type: object
@@ -26275,6 +26392,36 @@ rules:
   resources:
   - roles
   - rolebindings
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - eventing.knative.dev
+  resources:
+  - triggers
+  - triggers/status
+  - triggers/finalizers
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - sources.knative.dev
+  resources:
+  - sinkbindings
+  - sinkbindings/status
+  - sinkbindings/finalizers
   verbs:
   - create
   - delete
@@ -26696,8 +26843,9 @@ data:
   Dockerfile: "FROM quay.io/kiegroup/kogito-swf-builder-nightly:latest AS builder\n\n#
     variables that can be overridden by the builder\n# To add a Quarkus extension
     to your application\nARG QUARKUS_EXTENSIONS\n# Args to pass to the Quarkus CLI
-    add extension command\nARG QUARKUS_ADD_EXTENSION_ARGS\n\n# Copy from build context
-    to skeleton resources project\nCOPY --chown=1001 . ./resources\n\nRUN /home/kogito/launch/build-app.sh
+    add extension command\nARG QUARKUS_ADD_EXTENSION_ARGS\n# Additional java/mvn arguments
+    to pass to the builder\nARG MAVEN_ARGS_APPEND\n\n# Copy from build context to
+    skeleton resources project\nCOPY --chown=1001 . ./resources\n\nRUN /home/kogito/launch/build-app.sh
     ./resources\n  \n#=============================\n# Runtime Run\n#=============================\nFROM
     registry.access.redhat.com/ubi9/openjdk-17:latest\n\nENV LANG='en_US.UTF-8' LANGUAGE='en_US:en'\n
     \ \n# We make four distinct layers so if there are application changes the library

@@ -70,8 +70,11 @@ func (e *ensureRunningWorkflowState) Do(ctx context.Context, workflow *operatora
 
 	devBaseContainerImage := workflowdef.GetDefaultWorkflowDevModeImageTag()
 	// check if the Platform available
-	pl, err := platform.GetActivePlatform(ctx, e.C, workflow.Namespace)
-	if err == nil && len(pl.Spec.DevMode.BaseImage) > 0 {
+	pl, err := platform.GetActivePlatform(context.TODO(), e.C, workflow.Namespace)
+	if err != nil {
+		return ctrl.Result{Requeue: false}, objs, err
+	}
+	if pl != nil && len(pl.Spec.DevMode.BaseImage) > 0 {
 		devBaseContainerImage = pl.Spec.DevMode.BaseImage
 	}
 	userPropsCM, _, err := e.ensurers.userPropsConfigMap.Ensure(ctx, workflow)
@@ -93,8 +96,8 @@ func (e *ensureRunningWorkflowState) Do(ctx context.Context, workflow *operatora
 		return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, objs, nil
 	}
 
-	deployment, _, err := e.ensurers.deployment.Ensure(ctx, workflow,
-		deploymentMutateVisitor(workflow),
+	deployment, _, err := e.ensurers.deployment.Ensure(ctx, workflow, pl,
+		deploymentMutateVisitor(workflow, pl),
 		common.ImageDeploymentMutateVisitor(workflow, devBaseContainerImage),
 		mountDevConfigMapsMutateVisitor(workflow, flowDefCM.(*corev1.ConfigMap), userPropsCM.(*corev1.ConfigMap), managedPropsCM.(*corev1.ConfigMap), externalCM))
 	if err != nil {
@@ -113,6 +116,12 @@ func (e *ensureRunningWorkflowState) Do(ctx context.Context, workflow *operatora
 		return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, objs, err
 	}
 	objs = append(objs, route)
+
+	if knativeObjs, err := common.NewKnativeEventingHandler(e.StateSupport).Ensure(ctx, workflow); err != nil {
+		return ctrl.Result{RequeueAfter: constants.RequeueAfterFailure}, objs, err
+	} else {
+		objs = append(objs, knativeObjs...)
+	}
 
 	// First time reconciling this object, mark as wait for deployment
 	if workflow.Status.GetTopLevelCondition().IsUnknown() {

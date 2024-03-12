@@ -24,14 +24,13 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/workflowdef"
-
 	"github.com/apache/incubator-kie-kogito-serverless-operator/log"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/utils"
 	"k8s.io/klog/v2"
 
 	operatorapi "github.com/apache/incubator-kie-kogito-serverless-operator/api/v1alpha08"
-	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/constants"
 
 	"github.com/magiconair/properties"
@@ -97,7 +96,7 @@ func (a *serviceAppPropertyHandler) Build() string {
 	return props.String()
 }
 
-func generateReactiveURL(postgresSpec *operatorapi.PersistencePostgreSql, schema string, namespace string, dbName string, port int) (string, error) {
+func generateReactiveURL(postgresSpec *operatorapi.PersistencePostgreSQL, schema string, namespace string, dbName string, port int) (string, error) {
 	if len(postgresSpec.JdbcUrl) > 0 {
 		s := strings.TrimLeft(postgresSpec.JdbcUrl, "jdbc:")
 		u, err := url.Parse(s)
@@ -165,6 +164,7 @@ func GenerateDataIndexWorkflowProperties(workflow *operatorapi.SonataFlow, platf
 	di := NewDataIndexHandler(platform)
 	if workflow != nil && !profiles.IsDevProfile(workflow) && di.IsServiceEnabled() {
 		props.Set(constants.KogitoProcessDefinitionsEventsEnabled, "true")
+		props.Set(constants.KogitoProcessDefinitionsEventsErrorsEnabled, "true")
 		props.Set(constants.KogitoProcessInstancesEventsEnabled, "true")
 		props.Set(constants.KogitoDataIndexHealthCheckEnabled, "true")
 		di := NewDataIndexHandler(platform)

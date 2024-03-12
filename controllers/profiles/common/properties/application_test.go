@@ -124,13 +124,12 @@ func Test_appPropertyHandler_WithUserPropertiesWithNoUserOverrides(t *testing.T)
 	assert.NoError(t, err)
 	generatedProps, propsErr := properties.LoadString(props.WithUserProperties(userProperties).Build())
 	assert.NoError(t, propsErr)
-	assert.Equal(t, 7, len(generatedProps.Keys()))
+	assert.Equal(t, 6, len(generatedProps.Keys()))
 	assert.NotContains(t, "property1", generatedProps.Keys())
 	assert.NotContains(t, "property2", generatedProps.Keys())
 	assert.Equal(t, "http://greeting.default", generatedProps.GetString("kogito.service.url", ""))
 	assert.Equal(t, "8080", generatedProps.GetString("quarkus.http.port", ""))
 	assert.Equal(t, "0.0.0.0", generatedProps.GetString("quarkus.http.host", ""))
-	assert.Equal(t, "false", generatedProps.GetString("org.kie.kogito.addons.knative.eventing.health-enabled", ""))
 	assert.Equal(t, "false", generatedProps.GetString("quarkus.devservices.enabled", ""))
 	assert.Equal(t, "false", generatedProps.GetString("quarkus.kogito.devservices.enabled", ""))
 	assert.Equal(t, "false", generatedProps.GetString(constants.KogitoUserTasksEventsEnabled, ""))
@@ -157,7 +156,7 @@ func Test_appPropertyHandler_WithUserPropertiesWithServiceDiscovery(t *testing.T
 		Build())
 	generatedProps.DisableExpansion = true
 	assert.NoError(t, propsErr)
-	assert.Equal(t, 21, len(generatedProps.Keys()))
+	assert.Equal(t, 20, len(generatedProps.Keys()))
 	assert.NotContains(t, "property1", generatedProps.Keys())
 	assert.NotContains(t, "property2", generatedProps.Keys())
 	assertHasProperty(t, generatedProps, "service1", myService1Address)
@@ -181,7 +180,6 @@ func Test_appPropertyHandler_WithUserPropertiesWithServiceDiscovery(t *testing.T
 	assertHasProperty(t, generatedProps, "kogito.service.url", fmt.Sprintf("http://greeting.%s", defaultNamespace))
 	assertHasProperty(t, generatedProps, "quarkus.http.port", "8080")
 	assertHasProperty(t, generatedProps, "quarkus.http.host", "0.0.0.0")
-	assertHasProperty(t, generatedProps, "org.kie.kogito.addons.knative.eventing.health-enabled", "false")
 	assertHasProperty(t, generatedProps, "quarkus.devservices.enabled", "false")
 	assertHasProperty(t, generatedProps, "quarkus.kogito.devservices.enabled", "false")
 	assertHasProperty(t, generatedProps, constants.KogitoUserTasksEventsEnabled, "false")
@@ -242,11 +240,12 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	assert.NoError(t, err)
 	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).Build())
 	assert.NoError(t, propsErr)
-	assert.Equal(t, 16, len(generatedProps.Keys()))
+	assert.Equal(t, 17, len(generatedProps.Keys()))
 	assert.NotContains(t, "property1", generatedProps.Keys())
 	assert.NotContains(t, "property2", generatedProps.Keys())
 	assert.Equal(t, "http://"+platform.Name+"-"+constants.DataIndexServiceName+"."+platform.Namespace+"/definitions", generatedProps.GetString(constants.KogitoProcessDefinitionsEventsURL, ""))
 	assert.Equal(t, "true", generatedProps.GetString(constants.KogitoProcessDefinitionsEventsEnabled, ""))
+	assert.Equal(t, "true", generatedProps.GetString(constants.KogitoProcessDefinitionsEventsErrorsEnabled, ""))
 	assert.Equal(t, "http://"+platform.Name+"-"+constants.DataIndexServiceName+"."+platform.Namespace+"/processes", generatedProps.GetString(constants.KogitoProcessInstancesEventsURL, ""))
 	assert.Equal(t, "true", generatedProps.GetString(constants.KogitoProcessInstancesEventsEnabled, ""))
 	assert.Equal(t, "http://"+platform.Name+"-"+constants.JobServiceName+"."+platform.Namespace+"/v2/jobs/events", generatedProps.GetString(constants.JobServiceRequestEventsURL, ""))
@@ -275,7 +274,6 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	assert.Equal(t, "http://"+platform.Name+"-"+constants.JobServiceName+"."+platform.Namespace+"/v2/jobs/events", generatedProps.GetString(constants.JobServiceRequestEventsURL, ""))
 	assert.Equal(t, "", generatedProps.GetString(constants.JobServiceStatusChangeEvents, ""))
 	assert.Equal(t, "", generatedProps.GetString(constants.JobServiceStatusChangeEventsURL, ""))
-	assert.Equal(t, "http://"+platform.Name+"-"+constants.JobServiceName+"."+platform.Namespace, generatedProps.GetString(constants.KogitoJobServiceURL, ""))
 
 	// disabling job service bypasses config of outgoing events url
 	platform.Spec.Services.JobService.Enabled = nil
@@ -529,6 +527,7 @@ func generateDataIndexWorkflowProductionProperties() *properties.Properties {
 		dataIndexProdProperties.Set("mp.messaging.outgoing.kogito-processdefinitions-events.url", "http://foo-data-index-service.default/definitions")
 		dataIndexProdProperties.Set("mp.messaging.outgoing.kogito-processinstances-events.url", "http://foo-data-index-service.default/processes")
 		dataIndexProdProperties.Set("kogito.events.processdefinitions.enabled", "true")
+		dataIndexProdProperties.Set("kogito.events.processdefinitions.errors.propagate", "true")
 		dataIndexProdProperties.Set("kogito.events.processinstances.enabled", "true")
 		dataIndexProdProperties.Set("kogito.events.usertasks.enabled", "false")
 		dataIndexProdProperties.Sort()
@@ -570,6 +569,7 @@ func generateDataIndexAndJobServiceWorkflowProductionProperties() *properties.Pr
 		dataIndexJobServiceProdProperties.Set("mp.messaging.outgoing.kogito-job-service-job-request-events.connector", "quarkus-http")
 		dataIndexJobServiceProdProperties.Set("mp.messaging.outgoing.kogito-job-service-job-request-events.url", "http://foo-jobs-service.default/v2/jobs/events")
 		dataIndexJobServiceProdProperties.Set("kogito.events.processdefinitions.enabled", "true")
+		dataIndexJobServiceProdProperties.Set("kogito.events.processdefinitions.errors.propagate", "true")
 		dataIndexJobServiceProdProperties.Set("kogito.events.processinstances.enabled", "true")
 		dataIndexJobServiceProdProperties.Set("kogito.events.usertasks.enabled", "false")
 		dataIndexJobServiceProdProperties.Set("mp.messaging.outgoing.kogito-processdefinitions-events.url", "http://foo-data-index-service.default/definitions")
@@ -665,11 +665,11 @@ func setJobServiceJDBC(jdbc string) plfmOptionFn {
 			p.Spec.Services.JobService = &operatorapi.ServiceSpec{}
 		}
 		if p.Spec.Services.JobService.Persistence == nil {
-			p.Spec.Services.JobService.Persistence = &operatorapi.PersistenceOptions{}
+			p.Spec.Services.JobService.Persistence = &operatorapi.PersistenceOptionsSpec{}
 		}
-		if p.Spec.Services.JobService.Persistence.PostgreSql == nil {
-			p.Spec.Services.JobService.Persistence.PostgreSql = &operatorapi.PersistencePostgreSql{}
+		if p.Spec.Services.JobService.Persistence.PostgreSQL == nil {
+			p.Spec.Services.JobService.Persistence.PostgreSQL = &operatorapi.PersistencePostgreSQL{}
 		}
-		p.Spec.Services.JobService.Persistence.PostgreSql.JdbcUrl = jdbc
+		p.Spec.Services.JobService.Persistence.PostgreSQL.JdbcUrl = jdbc
 	}
 }

@@ -2,8 +2,11 @@
 
 helper = null
 
-minikubeClusterPlatform = 'minikube'
+KIND_VERSION = "v0.20.0"
+kindClusterPlatform = 'kind'
 openshiftClusterPlatform = 'openshift'
+
+kindLogsFolder = "/tmp/kind-logs"
 
 pipeline {
     agent {
@@ -54,6 +57,31 @@ pipeline {
                 }
             }
         }
+        stage('Load image into Kind') {
+            when {
+                expression { 
+                    return getClusterName() == kindClusterPlatform 
+                }
+            }
+            steps {
+                script {
+                    kind.loadImage(getTestImage())
+                }
+            }
+        }
+        stage('Deploy the operator') {
+            when {
+                expression { 
+                    return getClusterName() == kindClusterPlatform 
+                }
+            }
+            steps {
+                script {
+                    sh "make deploy IMG=${getTestImage()}"
+                    sh "kubectl wait pod -A -l control-plane=sonataflow-operator --for condition=Ready --timeout=120s"
+                }
+            }
+        }
         stage('Prepare for e2e tests') {
             when {
                 expression { 
@@ -90,16 +118,25 @@ pipeline {
                                 make test-e2e
                             """
                         } catch (err) {
+                            kind.exportLogs(kindLogsFolder)
                             sh 'make undeploy'
+                            deleteKindCluster()
                             throw err
                         }
                         sh 'kubectl get pods -A'
+                        deleteKindCluster()
                     }
                 }
             }
         }
     }
     post {
+        always {
+            script {
+                archiveArtifacts(artifacts: "**${kindLogsFolder}/**/*.*,**/e2e-test-report.xml")
+                junit '**/e2e-test-report.xml'
+            }
+        }
         cleanup {
             script {
                 clean()
@@ -111,7 +148,6 @@ pipeline {
 void clean() {
     helper.cleanGoPath()
     util.cleanNode(containerEngine)
-    cleanupCluster()
 }
 
 String getTestImage() {
@@ -128,10 +164,12 @@ String getOperatorVersion() {
 
 void setupCluster() {
     switch (getClusterName()) {
-        case minikubeClusterPlatform:
-            setupMinikube()
+        case kindClusterPlatform:
+            echo 'Creating kind cluster'
+            createKindCluster()
             break
         case openshiftClusterPlatform:
+            echo 'Setting up Openshift'
             setupOpenshift()
             break
         default:
@@ -139,13 +177,12 @@ void setupCluster() {
     }
 }
 
-void setupMinikube() {
-    // Start minikube
-    minikube.minikubeMemory = '12g'
-    minikube.start()
+void createKindCluster() {
+    sh(script: "make KIND_VERSION=${KIND_VERSION} create-cluster", returnStdout: true)
+}
 
-    minikube.waitForMinikubeStarted()
-    minikube.waitForMinikubeRegistry()
+void deleteKindCluster() {
+    sh(script: "make delete-cluster", returnStdout: true)
 }
 
 void setupOpenshift() {
@@ -155,8 +192,9 @@ void setupOpenshift() {
 
 void cleanupCluster() {
     switch (getClusterName()) {
-        case minikubeClusterPlatform:
-            minikube.stop()
+        case kindClusterPlatform:
+            echo 'Deleting kind cluster'
+            deleteKindCluster()
             break
         case openshiftClusterPlatform:
             echo 'Nothing to cleanup on openshift. All good !'
@@ -168,8 +206,8 @@ void cleanupCluster() {
 
 void executeInCluster(Closure executeClosure) {
     switch (getClusterName()) {
-        case minikubeClusterPlatform:
-            echo "Execute in minikube"
+        case kindClusterPlatform:
+            echo "Execute in kind"
             executeClosure()
             break
         case openshiftClusterPlatform:
@@ -185,7 +223,7 @@ void executeInCluster(Closure executeClosure) {
 
 void getPlatformCRFilePath() {
     switch (getClusterName()) {
-        case minikubeClusterPlatform:
+        case kindClusterPlatform:
             return 'test/testdata/sonataflow.org_v1alpha08_sonataflowplatform_withCache_minikube.yaml'
         case openshiftClusterPlatform:
             return 'test/testdata/sonataflow.org_v1alpha08_sonataflowplatform_openshift.yaml'

@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 2.0.0-snapshot
+VERSION ?= 999.0.0-snapshot
 REDUCED_VERSION ?= latest
 
 # CHANNELS define the bundle channels used in the bundle.
@@ -347,7 +347,7 @@ generate-all: generate generate-deploy bundle addheaders vet fmt
 
 .PHONY: test-e2e # You will need to have a Minikube/Kind cluster up in running to run this target, and run container-builder before the test
 test-e2e: install-operator-sdk
-	go test ./test/e2e/* -v -ginkgo.v -timeout 30m
+	go test ./test/e2e/* -v -ginkgo.v -ginkgo.no-color -ginkgo.junit-report=./e2e-test-report.xml -timeout 60m
 
 .PHONY: before-pr
 before-pr: test generate-all

@@ -44,6 +44,7 @@ const (
 	SonataFlowGreetingsWithDataInputSchemaCR  = "sonataflow.org_v1alpha08_sonataflow_greetings_datainput.yaml"
 	SonataFlowGreetingsWithStaticResourcesCR  = "sonataflow.org_v1alpha08_sonataflow-metainf.yaml"
 	SonataFlowSimpleOpsYamlCR                 = "sonataflow.org_v1alpha08_sonataflow-simpleops.yaml"
+	SonataFlowVetWithEventCR                  = "sonataflow.org_v1alpha08_sonataflow_vet_event.yaml"
 	SonataFlowGreetingsDataInputSchemaConfig  = "v1_configmap_greetings_datainput.yaml"
 	SonataFlowGreetingsStaticFilesConfig      = "v1_configmap_greetings_staticfiles.yaml"
 	sonataFlowPlatformYamlCR                  = "sonataflow.org_v1alpha08_sonataflowplatform.yaml"
@@ -202,6 +203,10 @@ func GetBaseSonataFlow(namespace string, options ...*func(*operatorapi.SonataFlo
 	return NewSonataFlow(sonataFlowSampleYamlCR, namespace)
 }
 
+func GetVetEventSonataFlow(namespace string) *operatorapi.SonataFlow {
+	return GetSonataFlow(SonataFlowVetWithEventCR, namespace)
+}
+
 func GetBaseSonataFlowWithDevProfile(namespace string) *operatorapi.SonataFlow {
 	return NewSonataFlow(sonataFlowSampleYamlCR, namespace, SetDevProfile)
 }
@@ -262,8 +267,17 @@ func GetSonataFlowE2eOrderProcessingFolder() string {
 func GetSonataFlowE2EPlatformServicesDirectory() string {
 	return filepath.Join(getTestDataDir(), "platform", "services")
 }
+
+func GetSonataFlowE2EPlatformNoServicesDirectory() string {
+	return filepath.Join(getTestDataDir(), "platform", "noservices")
+}
+
+func GetSonataFlowE2EPlatformPersistenceSampleDataDirectory(subdir string) string {
+	return filepath.Join(getTestDataDir(), "platform", "persistence", subdir)
+}
+
 func GetSonataFlowE2EWorkflowPersistenceSampleDataDirectory(subdir string) string {
-	return filepath.Join(getTestDataDir(), "persistence", "workflow", subdir)
+	return filepath.Join(getTestDataDir(), "workflow", "persistence", subdir)
 }
 
 // getTestDataDir gets the testdata directory containing every sample out there from test/testdata.

@@ -15,8 +15,6 @@
 package e2e
 
 import (
-	//nolint:golint
-	//nolint:revive
 	"bytes"
 	"fmt"
 	"math/rand"
@@ -38,10 +36,13 @@ import (
 )
 
 const (
-	ephemeral  = "ephemeral"
-	postgreSQL = "postgreSQL"
-	dev        = "dev"
-	production = "prod"
+	ephemeral            = "ephemeral"
+	postgreSQL           = "postgreSQL"
+	dev                  = "dev"
+	production           = "prod"
+	clusterWideEphemeral = "cluster-wide-ephemeral"
+	ephemeralDataIndex   = "ephemeral-data-index"
+	ephemeralJobService  = "ephemeral-job-service"
 )
 
 var _ = Describe("Validate the persistence", Ordered, func() {
@@ -87,7 +88,7 @@ var _ = Describe("Validate the persistence", Ordered, func() {
 				cmd = exec.Command("kubectl", "wait", "pod", "-n", targetNamespace, "-l", "app=sonataflow-platform", "--for", "condition=Ready", "--timeout=5s")
 				_, err = utils.Run(cmd)
 				return err
-			}, 10*time.Minute, 5).Should(Succeed())
+			}, 20*time.Minute, 5).Should(Succeed())
 			By("Evaluate status of service's health endpoint")
 			cmd = exec.Command("kubectl", "get", "pod", "-l", "app=sonataflow-platform", "-n", targetNamespace, "-ojsonpath={.items[*].metadata.name}")
 			output, err := utils.Run(cmd)
@@ -113,14 +114,47 @@ var _ = Describe("Validate the persistence", Ordered, func() {
 				Expect(sf).NotTo(BeEmpty(), "sonataflow name is empty")
 				EventuallyWithOffset(1, func() bool {
 					return verifyWorkflowIsInRunningStateInNamespace(sf, targetNamespace)
-				}, 5*time.Minute, 5).Should(BeTrue())
+				}, 10*time.Minute, 5).Should(BeTrue())
 			}
 		},
 			Entry("with both Job Service and Data Index and ephemeral persistence and the workflow in a dev profile", test.GetSonataFlowE2EPlatformServicesDirectory(), dev, ephemeral),
-			XEntry("with both Job Service and Data Index and ephemeral persistence and the workflow in a production profile", test.GetSonataFlowE2EPlatformServicesDirectory(), production, ephemeral),
+			Entry("with both Job Service and Data Index and ephemeral persistence and the workflow in a production profile", test.GetSonataFlowE2EPlatformServicesDirectory(), production, ephemeral),
 			Entry("with both Job Service and Data Index and postgreSQL persistence and the workflow in a dev profile", test.GetSonataFlowE2EPlatformServicesDirectory(), dev, postgreSQL),
-			XEntry("with both Job Service and Data Index and postgreSQL persistence and the workflow in a production profile", test.GetSonataFlowE2EPlatformServicesDirectory(), production, postgreSQL),
+			Entry("with both Job Service and Data Index and postgreSQL persistence and the workflow in a production profile", test.GetSonataFlowE2EPlatformServicesDirectory(), production, postgreSQL),
 		)
 
 	})
+
+	DescribeTable("when deploying a SonataFlowPlatform CR with PostgreSQL Persistence", func(testcaseDir string) {
+		By("Deploy the CR")
+		var manifests []byte
+		EventuallyWithOffset(1, func() error {
+			var err error
+			cmd := exec.Command("kubectl", "kustomize", testcaseDir)
+			manifests, err = utils.Run(cmd)
+			return err
+		}, time.Minute, time.Second).Should(Succeed())
+		cmd := exec.Command("kubectl", "create", "-n", targetNamespace, "-f", "-")
+		cmd.Stdin = bytes.NewBuffer(manifests)
+		_, err := utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred())
+		By("Wait for SonatatFlowPlatform CR to complete deployment")
+		// wait for service deployments to be ready
+		EventuallyWithOffset(1, func() error {
+			cmd = exec.Command("kubectl", "wait", "pod", "-n", targetNamespace, "-l", "app=sonataflow-platform", "--for", "condition=Ready", "--timeout=5s")
+			_, err = utils.Run(cmd)
+			return err
+		}, 10*time.Minute, 5).Should(Succeed())
+		By("Evaluate status of all service's health endpoint")
+		cmd = exec.Command("kubectl", "get", "pod", "-l", "app=sonataflow-platform", "-n", targetNamespace, "-ojsonpath={.items[*].metadata.name}")
+		output, err := utils.Run(cmd)
+		Expect(err).NotTo(HaveOccurred())
+		for _, pn := range strings.Split(string(output), " ") {
+			verifyHealthStatusInPod(pn, targetNamespace)
+		}
+	},
+		Entry("and both Job Service and Data Index using the persistence from platform CR", test.GetSonataFlowE2EPlatformPersistenceSampleDataDirectory("generic_from_platform_cr")),
+		Entry("and both Job Service and Data Index using the one defined in each service, discarding the one from the platform CR", test.GetSonataFlowE2EPlatformPersistenceSampleDataDirectory("overwritten_by_services")),
+	)
+
 })

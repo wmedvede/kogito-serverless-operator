@@ -127,7 +127,7 @@ metadata:
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
     repository: https://github.com/apache/incubator-kie-kogito-serverless-operator
     support: Red Hat
-  name: sonataflow-operator.v2.0.0-snapshot
+  name: sonataflow-operator.v999.0.0-snapshot
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -185,7 +185,19 @@ spec:
       displayName: Sonata Flow Cluster Platform
       kind: SonataFlowClusterPlatform
       name: sonataflowclusterplatforms.sonataflow.org
+      resources:
+      - kind: SonataFlowPlatform
+        name: A SonataFlow Platform
+        version: sonataflow.org/v1alpha08
       specDescriptors:
+      - description: Capabilities defines which platform capabilities should be applied
+          cluster-wide. If nil, defaults to `capabilities.workflows["services"]`
+        displayName: Capabilities
+        path: capabilities
+      - description: PlatformRef defines which existing SonataFlowPlatform's supporting
+          services should be used cluster-wide.
+        displayName: PlatformRef
+        path: platformRef
       - description: Name of the SonataFlowPlatform
         displayName: Platform_Name
         path: platformRef.name
@@ -236,6 +248,13 @@ spec:
           no build required)
         displayName: DevMode
         path: devMode
+      - description: 'Services attributes for deploying supporting applications like
+          Data Index & Job Service. Only workflows without the `sonataflow.org/profile:
+          dev` annotation will be configured to use these service(s). Setting this
+          will override the use of any cluster-scoped services that might be defined
+          via `SonataFlowClusterPlatform`.'
+        displayName: Services
+        path: services
       - description: PodTemplate describes the deployment details of this platform
           service instance.
         displayName: podTemplate
@@ -249,6 +268,10 @@ spec:
           or OpenShift)
         displayName: cluster
         path: cluster
+      - description: ClusterPlatformRef information related to the (optional) active
+          SonataFlowClusterPlatform
+        displayName: clusterPlatformRef
+        path: clusterPlatformRef
       - description: Info generic information related to the build
         displayName: info
         path: info
@@ -289,6 +312,9 @@ spec:
           definition. For example, a collection of OpenAPI specification files.
         displayName: resources
         path: resources
+      - description: Sink describes the sinkBinding details of this SonataFlow instance.
+        displayName: sink
+        path: sink
       statusDescriptors:
       - description: Address is used as a part of Addressable interface (status.address.url)
           for knative
@@ -368,6 +394,36 @@ spec:
           resources:
           - roles
           - rolebindings
+          verbs:
+          - create
+          - delete
+          - deletecollection
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - eventing.knative.dev
+          resources:
+          - triggers
+          - triggers/status
+          - triggers/finalizers
+          verbs:
+          - create
+          - delete
+          - deletecollection
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - sources.knative.dev
+          resources:
+          - sinkbindings
+          - sinkbindings/status
+          - sinkbindings/finalizers
           verbs:
           - create
           - delete
@@ -793,4 +849,4 @@ spec:
   minKubeVersion: 1.23.0
   provider:
     name: Red Hat
-  version: 2.0.0-snapshot
+  version: 999.0.0-snapshot

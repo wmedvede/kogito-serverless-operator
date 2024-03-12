@@ -22,6 +22,7 @@ package prod
 import (
 	"time"
 
+	"github.com/apache/incubator-kie-kogito-serverless-operator/api/metadata"
 	"k8s.io/client-go/rest"
 
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/discovery"
@@ -29,7 +30,6 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apache/incubator-kie-kogito-serverless-operator/api/metadata"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common"
 )
@@ -52,7 +52,7 @@ const (
 // ReconciliationState that needs access to it must include this struct as an attribute and initialize it in the profile builder.
 // Use newObjectEnsurers to facilitate building this struct
 type objectEnsurers struct {
-	deployment            common.ObjectEnsurer
+	deployment            common.ObjectEnsurerWithPlatform
 	service               common.ObjectEnsurer
 	userPropsConfigMap    common.ObjectEnsurer
 	managedPropsConfigMap common.ObjectEnsurerWithPlatform
@@ -60,7 +60,7 @@ type objectEnsurers struct {
 
 func newObjectEnsurers(support *common.StateSupport) *objectEnsurers {
 	return &objectEnsurers{
-		deployment:            common.NewObjectEnsurer(support.C, common.DeploymentCreator),
+		deployment:            common.NewObjectEnsurerWithPlatform(support.C, common.DeploymentCreator),
 		service:               common.NewObjectEnsurer(support.C, common.ServiceCreator),
 		userPropsConfigMap:    common.NewObjectEnsurer(support.C, common.UserPropsConfigMapCreator),
 		managedPropsConfigMap: common.NewObjectEnsurerWithPlatform(support.C, common.ManagedPropsConfigMapCreator),
@@ -72,6 +72,7 @@ func newObjectEnsurers(support *common.StateSupport) *objectEnsurers {
 func NewProfileReconciler(client client.Client, cfg *rest.Config, recorder record.EventRecorder) profiles.ProfileReconciler {
 	support := &common.StateSupport{
 		C:        client,
+		Cfg:      cfg,
 		Catalog:  discovery.NewServiceCatalogForConfig(client, cfg),
 		Recorder: recorder,
 	}
@@ -93,6 +94,7 @@ func NewProfileReconciler(client client.Client, cfg *rest.Config, recorder recor
 func NewProfileForOpsReconciler(client client.Client, cfg *rest.Config, recorder record.EventRecorder) profiles.ProfileReconciler {
 	support := &common.StateSupport{
 		C:        client,
+		Cfg:      cfg,
 		Catalog:  discovery.NewServiceCatalogForConfig(client, cfg),
 		Recorder: recorder,
 	}
