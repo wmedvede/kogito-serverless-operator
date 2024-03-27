@@ -1,4 +1,4 @@
-# Copyright 2023 Red Hat, Inc. and/or its affiliates
+# Copyright 2024 Apache Software Foundation (ASF)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,25 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-apiVersion: sonataflow.org/v1alpha08
-kind: SonataFlow
-metadata:
-  name: simple
-  annotations:
-    sonataflow.org/description: Simple example on k8s!
-    sonataflow.org/version: 0.0.1
-  labels:
-    test: test
-    app: not-simple
-spec:
-  podTemplate:
-    container:
-      image: quay.io/kiegroup/sonataflow-minimal-example:latest
-  flow:
-    start: HelloWorld
-    states:
-      - name: HelloWorld
-        type: inject
-        data:
-          message: Hello World
-        end: true
+resources:
+- 02-sonataflow_platform.yaml
+- sonataflow/03-sonataflow_callbackstatetimeouts.sw.yaml
+
+sortOptions:
+  order: fifo

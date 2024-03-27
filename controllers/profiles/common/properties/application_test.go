@@ -30,6 +30,7 @@ import (
 	"github.com/apache/incubator-kie-kogito-serverless-operator/api/metadata"
 	operatorapi "github.com/apache/incubator-kie-kogito-serverless-operator/api/v1alpha08"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/discovery"
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/platform/services"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/constants"
 
 	"github.com/magiconair/properties"
@@ -211,6 +212,8 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 		},
 	}
 
+	services.SetServiceUrlsInWorkflowStatus(platform, workflow)
+	assert.Nil(t, workflow.Status.Services)
 	props, err := NewAppPropertyHandler(workflow, platform)
 	assert.NoError(t, err)
 	generatedProps, propsErr := properties.LoadString(props.WithUserProperties(userProperties).Build())
@@ -235,7 +238,11 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 	assert.Equal(t, "false", generatedProps.GetString(constants.KogitoUserTasksEventsEnabled, ""))
 
 	// prod profile enables config of outgoing events url
-	workflow.SetAnnotations(map[string]string{metadata.Profile: string(metadata.ProdProfile)})
+	workflow.SetAnnotations(map[string]string{metadata.Profile: string(metadata.PreviewProfile)})
+	services.SetServiceUrlsInWorkflowStatus(platform, workflow)
+	assert.NotNil(t, workflow.Status.Services)
+	assert.NotNil(t, workflow.Status.Services.JobServiceRef)
+	assert.NotNil(t, workflow.Status.Services.DataIndexRef)
 	props, err = NewAppPropertyHandler(workflow, platform)
 	assert.NoError(t, err)
 	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).Build())
@@ -259,6 +266,10 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 
 	// disabling data index bypasses config of outgoing events url
 	platform.Spec.Services.DataIndex.Enabled = nil
+	services.SetServiceUrlsInWorkflowStatus(platform, workflow)
+	assert.NotNil(t, workflow.Status.Services)
+	assert.NotNil(t, workflow.Status.Services.JobServiceRef)
+	assert.Nil(t, workflow.Status.Services.DataIndexRef)
 	props, err = NewAppPropertyHandler(workflow, platform)
 	assert.NoError(t, err)
 	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).Build())
@@ -277,6 +288,8 @@ func Test_appPropertyHandler_WithServicesWithUserOverrides(t *testing.T) {
 
 	// disabling job service bypasses config of outgoing events url
 	platform.Spec.Services.JobService.Enabled = nil
+	services.SetServiceUrlsInWorkflowStatus(platform, workflow)
+	assert.Nil(t, workflow.Status.Services)
 	props, err = NewAppPropertyHandler(workflow, platform)
 	assert.NoError(t, err)
 	generatedProps, propsErr = properties.LoadString(props.WithUserProperties(userProperties).Build())
@@ -303,6 +316,7 @@ var _ = Describe("Platform properties", func() {
 
 			DescribeTable("only job services when the spec",
 				func(wf *operatorapi.SonataFlow, plfm *operatorapi.SonataFlowPlatform, expectedProperties *properties.Properties) {
+					services.SetServiceUrlsInWorkflowStatus(plfm, wf)
 					handler, err := NewAppPropertyHandler(wf, plfm)
 					Expect(err).NotTo(HaveOccurred())
 					p, err := properties.LoadString(handler.Build())
@@ -315,7 +329,7 @@ var _ = Describe("Platform properties", func() {
 					generatePlatform(setJobServiceEnabledValue(&disabled), setPlatformNamespace("default"), setPlatformName("foo")),
 					generateJobServiceWorkflowDevProperties()),
 				Entry("has enabled field set to false and workflow with production profile",
-					generateFlow(setProfileInFlow(metadata.ProdProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
+					generateFlow(setProfileInFlow(metadata.PreviewProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
 					generatePlatform(setJobServiceEnabledValue(&disabled), setPlatformNamespace("default"), setPlatformName("foo")),
 					generateJobServiceWorkflowDevProperties()),
 				Entry("has enabled field undefined and workflow with dev profile",
@@ -323,7 +337,7 @@ var _ = Describe("Platform properties", func() {
 					generatePlatform(setJobServiceEnabledValue(nil), setPlatformNamespace("default"), setPlatformName("foo")),
 					generateJobServiceWorkflowDevProperties()),
 				Entry("has enabled field undefined and workflow with production profile",
-					generateFlow(setProfileInFlow(metadata.ProdProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
+					generateFlow(setProfileInFlow(metadata.PreviewProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
 					generatePlatform(setJobServiceEnabledValue(nil), setPlatformNamespace("default"), setPlatformName("foo")),
 					generateJobServiceWorkflowDevProperties()),
 				Entry("has enabled field set to true and workflow with dev profile",
@@ -331,7 +345,7 @@ var _ = Describe("Platform properties", func() {
 					generatePlatform(setJobServiceEnabledValue(&enabled), setPlatformName("foo"), setPlatformNamespace("default")),
 					generateJobServiceWorkflowDevProperties()),
 				Entry("has enabled field set to true and workflow with production profile",
-					generateFlow(setProfileInFlow(metadata.ProdProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
+					generateFlow(setProfileInFlow(metadata.PreviewProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
 					generatePlatform(setJobServiceEnabledValue(&enabled), setPlatformName("foo"), setPlatformNamespace("default")),
 					generateJobServiceWorkflowProductionProperties()),
 				Entry("has enabled field set to true and workflow with no profile",
@@ -350,6 +364,7 @@ var _ = Describe("Platform properties", func() {
 
 			DescribeTable("only data index service when the spec",
 				func(wf *operatorapi.SonataFlow, plfm *operatorapi.SonataFlowPlatform, expectedProperties *properties.Properties) {
+					services.SetServiceUrlsInWorkflowStatus(plfm, wf)
 					handler, err := NewAppPropertyHandler(wf, plfm)
 					Expect(err).NotTo(HaveOccurred())
 					p, err := properties.LoadString(handler.Build())
@@ -362,7 +377,7 @@ var _ = Describe("Platform properties", func() {
 					generatePlatform(setDataIndexEnabledValue(&disabled), setPlatformNamespace("default"), setPlatformName("foo")),
 					generateDataIndexWorkflowDevProperties()),
 				Entry("has enabled field set to false and workflow with production profile",
-					generateFlow(setProfileInFlow(metadata.ProdProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
+					generateFlow(setProfileInFlow(metadata.PreviewProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
 					generatePlatform(setDataIndexEnabledValue(&disabled), setPlatformNamespace("default"), setPlatformName("foo")),
 					generateDataIndexWorkflowDevProperties()),
 				Entry("has enabled field undefined and workflow with dev profile",
@@ -370,7 +385,7 @@ var _ = Describe("Platform properties", func() {
 					generatePlatform(setDataIndexEnabledValue(nil), setPlatformNamespace("default"), setPlatformName("foo")),
 					generateDataIndexWorkflowDevProperties()),
 				Entry("has enabled field undefined and workflow with production profile",
-					generateFlow(setProfileInFlow(metadata.ProdProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
+					generateFlow(setProfileInFlow(metadata.PreviewProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
 					generatePlatform(setDataIndexEnabledValue(nil), setPlatformNamespace("default"), setPlatformName("foo")),
 					generateDataIndexWorkflowDevProperties()),
 				Entry("has enabled field set to true and workflow with dev profile",
@@ -378,7 +393,7 @@ var _ = Describe("Platform properties", func() {
 					generatePlatform(setDataIndexEnabledValue(&enabled), setPlatformNamespace("default"), setPlatformName("foo")),
 					generateDataIndexWorkflowDevProperties()),
 				Entry("has enabled field set to true and workflow with production profile",
-					generateFlow(setProfileInFlow(metadata.ProdProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
+					generateFlow(setProfileInFlow(metadata.PreviewProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
 					generatePlatform(setDataIndexEnabledValue(&enabled), setPlatformNamespace("default"), setPlatformName("foo")),
 					generateDataIndexWorkflowProductionProperties()),
 				Entry("has enabled field set to false and workflow with no profile",
@@ -396,6 +411,7 @@ var _ = Describe("Platform properties", func() {
 			)
 
 			DescribeTable("both Data Index and Job Services are available and", func(wf *operatorapi.SonataFlow, plfm *operatorapi.SonataFlowPlatform, expectedProperties *properties.Properties) {
+				services.SetServiceUrlsInWorkflowStatus(plfm, wf)
 				handler, err := NewAppPropertyHandler(wf, plfm)
 				Expect(err).NotTo(HaveOccurred())
 				p, err := properties.LoadString(handler.Build())
@@ -408,7 +424,7 @@ var _ = Describe("Platform properties", func() {
 					generatePlatform(setPlatformNamespace("default"), setPlatformName("foo")),
 					generateDataIndexAndJobServiceWorkflowDevProperties()),
 				Entry("both are undefined and workflow in prod profile",
-					generateFlow(setProfileInFlow(metadata.ProdProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
+					generateFlow(setProfileInFlow(metadata.PreviewProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
 					generatePlatform(setPlatformNamespace("default"), setPlatformName("foo")),
 					generateDataIndexAndJobServiceWorkflowDevProperties()),
 				Entry("both have enabled field set to true and workflow with dev profile",
@@ -416,7 +432,7 @@ var _ = Describe("Platform properties", func() {
 					generatePlatform(setJobServiceEnabledValue(&enabled), setDataIndexEnabledValue(&enabled), setPlatformName("foo"), setPlatformNamespace("default")),
 					generateDataIndexAndJobServiceWorkflowDevProperties()),
 				Entry("both have enabled field set to true and workflow with production profile",
-					generateFlow(setProfileInFlow(metadata.ProdProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
+					generateFlow(setProfileInFlow(metadata.PreviewProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
 					generatePlatform(setJobServiceEnabledValue(&enabled), setDataIndexEnabledValue(&enabled), setPlatformName("foo"), setPlatformNamespace("default")),
 					generateDataIndexAndJobServiceWorkflowProductionProperties()),
 				Entry("both have enabled field undefined and workflow with dev profile",
@@ -424,7 +440,7 @@ var _ = Describe("Platform properties", func() {
 					generatePlatform(setJobServiceEnabledValue(nil), setDataIndexEnabledValue(nil), setPlatformName("foo"), setPlatformNamespace("default")),
 					generateDataIndexAndJobServiceWorkflowDevProperties()),
 				Entry("both have enabled field undefined and workflow with production profile",
-					generateFlow(setProfileInFlow(metadata.ProdProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
+					generateFlow(setProfileInFlow(metadata.PreviewProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
 					generatePlatform(setJobServiceEnabledValue(nil), setDataIndexEnabledValue(nil), setPlatformName("foo"), setPlatformNamespace("default"), setJobServiceJDBC("jdbc:postgresql://postgres:5432/sonataflow?currentSchema=myschema")),
 					generateDataIndexAndJobServiceWorkflowDevProperties()),
 				Entry("both have enabled field set to false and workflow with dev profile",
@@ -432,7 +448,7 @@ var _ = Describe("Platform properties", func() {
 					generatePlatform(setJobServiceEnabledValue(&disabled), setDataIndexEnabledValue(&disabled), setPlatformName("foo"), setPlatformNamespace("default"), setJobServiceJDBC("jdbc:postgresql://postgres:5432/sonataflow?currentSchema=myschema")),
 					generateDataIndexAndJobServiceWorkflowDevProperties()),
 				Entry("both have enabled field set to false and workflow with production profile",
-					generateFlow(setProfileInFlow(metadata.ProdProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
+					generateFlow(setProfileInFlow(metadata.PreviewProfile), setWorkflowName("foo"), setWorkflowNamespace("default")),
 					generatePlatform(setJobServiceEnabledValue(&disabled), setDataIndexEnabledValue(&disabled), setPlatformName("foo"), setPlatformNamespace("default"), setJobServiceJDBC("jdbc:postgresql://postgres:5432/sonataflow?currentSchema=myschema")),
 					generateDataIndexAndJobServiceWorkflowDevProperties()),
 				Entry("both have enabled field set to false and workflow with no profile",
