@@ -915,7 +915,7 @@ spec:
               persistence:
                 description: Persistence defines the platform persistence configuration.
                   When this field is set, the configuration is used as the persistence
-                  for platform services and sonataflow instances that don't provide
+                  for platform services and SonataFlow instances that don't provide
                   one of their own.
                 maxProperties: 1
                 properties:
@@ -968,6 +968,78 @@ spec:
                     required:
                     - secretRef
                     type: object
+                type: object
+              properties:
+                description: "Properties defines the property set for a given actor
+                  in the current context. For example, the workflow managed properties.
+                  One can define here a set of properties for SonataFlow deployments
+                  that will be reused across every workflow deployment. \n These properties
+                  MAY NOT be propagated to a SonataFlowClusterPlatform since PropertyVarSource
+                  can only refer local context sources."
+                properties:
+                  flow:
+                    description: Properties that will be added to the SonataFlow managed
+                      configMaps in the current context.
+                    items:
+                      description: PropertyVar is the entry for a property set derived
+                        from the Kubernetes API EnvVar. Note that the name doesn't
+                        have to match C_IDENTIFIER.
+                      properties:
+                        name:
+                          description: The property name
+                          type: string
+                        value:
+                          description: Defaults to "".
+                          type: string
+                        valueFrom:
+                          description: Source for the property's value. Cannot be
+                            used if value is not empty.
+                          properties:
+                            configMapKeyRef:
+                              description: Selects a key of a ConfigMap.
+                              properties:
+                                key:
+                                  description: The key to select.
+                                  type: string
+                                name:
+                                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    TODO: Add other useful fields. apiVersion, kind,
+                                    uid?'
+                                  type: string
+                                optional:
+                                  description: Specify whether the ConfigMap or its
+                                    key must be defined
+                                  type: boolean
+                              required:
+                              - key
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            secretKeyRef:
+                              description: Selects a key of a secret in the flow's
+                                namespace
+                              properties:
+                                key:
+                                  description: The key of the secret to select from.  Must
+                                    be a valid secret key.
+                                  type: string
+                                name:
+                                  description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    TODO: Add other useful fields. apiVersion, kind,
+                                    uid?'
+                                  type: string
+                                optional:
+                                  description: Specify whether the Secret or its key
+                                    must be defined
+                                  type: boolean
+                              required:
+                              - key
+                              type: object
+                              x-kubernetes-map-type: atomic
+                          type: object
+                      required:
+                      - name
+                      type: object
+                    type: array
                 type: object
               services:
                 description: 'Services attributes for deploying supporting applications
@@ -26857,7 +26929,6 @@ subjects:
 ---
 apiVersion: v1
 data:
-  DEFAULT_BUILDER_RESOURCE_NAME: Dockerfile
   DEFAULT_WORKFLOW_EXTENSION: .sw.json
   Dockerfile: "FROM quay.io/kiegroup/kogito-swf-builder-nightly:latest AS builder\n\n#
     variables that can be overridden by the builder\n# To add a Quarkus extension
@@ -26881,21 +26952,38 @@ metadata:
 ---
 apiVersion: v1
 data:
-  controller_manager_config.yaml: |
-    apiVersion: controller-runtime.sigs.k8s.io/v1alpha1
-    kind: ControllerManagerConfig
-    health:
-      healthProbeBindAddress: :8081
-    metrics:
-      bindAddress: 127.0.0.1:8080
-    webhook:
-      port: 9443
-    leaderElection:
-      leaderElect: true
-      resourceName: 1be5e57d.kiegroup.org
+  controllers_cfg.yaml: |
+    # The default size of Kaniko PVC when using the internal operator builder manager
+    defaultPvcKanikoSize: 1Gi
+    # How much time (in seconds) to wait for a devmode workflow to start.
+    # This information is used for the controller manager to create new devmode containers and setup the healthcheck probes.
+    healthFailureThresholdDevMode: 50
+    # Default image used internally by the Operator Managed Kaniko builder to create the warmup pods
+    kanikoDefaultWarmerImageTag: gcr.io/kaniko-project/warmer:v1.9.0
+    # Default image used internally by the Operator Managed Kaniko builder to create the executor pods
+    kanikoExecutorImageTag: gcr.io/kaniko-project/executor:v1.9.0
+    # The Jobs Service image to use, if empty the operator will use the default Apache Community one based on the current operator's version
+    jobsServicePostgreSQLImageTag: ""
+    jobsServiceEphemeralImageTag: ""
+    # The Data Index image to use, if empty the operator will use the default Apache Community one based on the current operator's version
+    dataIndexPostgreSQLImageTag: ""
+    dataIndexEphemeralTag: ""
+    # SonataFlow base builder image used in the internal Dockerfile to build workflow applications in preview profile
+    # Order of precedence is:
+    # 1. SonataFlowPlatform in the given namespace
+    # 2. This configuration
+    # 3. The FROM in the Dockerfile in the operator's namespace "sonataflow-operator-builder-config" configMap.
+    # If 1 or 2, the FROM tag will be replaced by the tag se there.
+    # If empty the operator will use the default Apache Community one based on the current operator's version.
+    sonataFlowBaseBuilderImageTag: ""
+    # The image to use to deploy SonataFlow workflow images in devmode profile.
+    # If empty the operator will use the default Apache Community one based on the current operator's version.
+    sonataFlowDevModeImageTag: ""
+    # The default name of the builder configMap in the operator's namespace
+    builderConfigMapName: "sonataflow-operator-builder-config"
 kind: ConfigMap
 metadata:
-  name: sonataflow-operator-manager-config
+  name: sonataflow-operator-controllers-config
   namespace: sonataflow-operator-system
 ---
 apiVersion: v1
@@ -26935,31 +27023,6 @@ spec:
     spec:
       containers:
       - args:
-        - --secure-listen-address=0.0.0.0:8443
-        - --upstream=http://127.0.0.1:8080/
-        - --logtostderr=true
-        - --v=0
-        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
-        name: kube-rbac-proxy
-        ports:
-        - containerPort: 8443
-          name: https
-          protocol: TCP
-        resources:
-          limits:
-            cpu: 500m
-            memory: 128Mi
-          requests:
-            cpu: 5m
-            memory: 64Mi
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          seccompProfile:
-            type: RuntimeDefault
-      - args:
         - --health-probe-bind-address=:8081
         - --metrics-bind-address=127.0.0.1:8080
         - --leader-elect
@@ -26997,7 +27060,40 @@ spec:
           capabilities:
             drop:
             - ALL
+        volumeMounts:
+        - mountPath: /config/controllers_cfg.yaml
+          name: controllers-config
+          subPath: controllers_cfg.yaml
+      - args:
+        - --secure-listen-address=0.0.0.0:8443
+        - --upstream=http://127.0.0.1:8080/
+        - --logtostderr=true
+        - --v=0
+        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
+        name: kube-rbac-proxy
+        ports:
+        - containerPort: 8443
+          name: https
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 5m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
       securityContext:
         runAsNonRoot: true
       serviceAccountName: sonataflow-operator-controller-manager
       terminationGracePeriodSeconds: 10
+      volumes:
+      - configMap:
+          name: sonataflow-operator-controllers-config
+        name: controllers-config
