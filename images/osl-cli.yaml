@@ -14,20 +14,20 @@
 
 - name: "packager"
   version: 1.33.0-snapshot
-  from: "registry.access.redhat.com/ubi8/ubi-minimal:8.9-1161"
+  from: "registry.access.redhat.com/ubi8/ubi-minimal:latest"
   modules:
     repositories:
       - path: modules
     install:
       - name: com.redhat.osl.cli.packager
 
-- name: "kn-workflow-cli-artifacts"
+- name: "openshift-serverless-1/logic-kn-workflow-cli-artifacts-rhel8"
   version: 1.33.0-snapshot
   description: "Red Hat OpenShift Serverless Logic 1 kn-workflow CLI artifacts"
-  from: "registry.access.redhat.com/ubi8/ubi-minimal:8.9-1161"
+  from: "registry.access.redhat.com/ubi8/ubi-minimal:latest"
   labels:
     - name: com.redhat.component
-      value: "openshift-serverless-1-kn-workflow-cli-artifacts-rhel8-container"
+      value: "openshift-serverless-1-logic-kn-workflow-cli-artifacts-rhel8-container"
     - name: name
       value: "openshift-serverless-1/kn-workflow-cli-artifacts-rhel8"
     - name: version
@@ -51,3 +51,21 @@
       - name: com.redhat.osl.cli.artifacts
   run:
     user: 65532
+    
+packages:
+  manager: microdnf
+  content_sets_file: content_sets.yaml
+
+osbs:
+  configuration:
+    container:
+      platforms:
+        only:
+        - x86_64
+        - aarch64
+        - ppc64le
+      compose:
+        pulp_repos: true
+  repository:
+    name: containers/openshift-serverless-1-logic-kn-workflow-cli-artifacts
+    branch: openshift-serverless-1.33-rhel-8    
