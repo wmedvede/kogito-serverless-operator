@@ -94,13 +94,13 @@ func Test_ensureWorkflowPropertiesConfigMapMutator_DollarReplacement(t *testing.
 
 func TestMergePodSpec(t *testing.T) {
 	workflow := test.GetBaseSonataFlow(t.Name())
-	workflow.Spec.PodTemplate = v1alpha08.PodTemplateSpec{
+	workflow.Spec.PodTemplate = v1alpha08.FlowPodTemplateSpec{
 		Container: v1alpha08.ContainerSpec{
 			// this one we can override
 			Image: "quay.io/example/my-workflow:1.0.0",
 			Ports: []corev1.ContainerPort{
 				// let's override a immutable attribute
-				{Name: utils.HttpScheme, ContainerPort: 9090},
+				{Name: utils.DefaultServicePortName, ContainerPort: 9090},
 			},
 			Env: []corev1.EnvVar{
 				// We should be able to override this too
@@ -147,7 +147,7 @@ func TestMergePodSpec(t *testing.T) {
 
 func TestMergePodSpec_OverrideContainers(t *testing.T) {
 	workflow := test.GetBaseSonataFlow(t.Name())
-	workflow.Spec.PodTemplate = v1alpha08.PodTemplateSpec{
+	workflow.Spec.PodTemplate = v1alpha08.FlowPodTemplateSpec{
 		PodSpec: v1alpha08.PodSpec{
 			// Try to override the workflow container via the podspec
 			Containers: []corev1.Container{
@@ -155,7 +155,7 @@ func TestMergePodSpec_OverrideContainers(t *testing.T) {
 					Name:  v1alpha08.DefaultContainerName,
 					Image: "quay.io/example/my-workflow:1.0.0",
 					Ports: []corev1.ContainerPort{
-						{Name: utils.HttpScheme, ContainerPort: 9090},
+						{Name: utils.DefaultServicePortName, ContainerPort: 9090},
 					},
 					Env: []corev1.EnvVar{
 						{Name: "ENV1", Value: "VALUE_CUSTOM"},
@@ -213,13 +213,13 @@ func Test_ensureWorkflowTriggersAreCreated(t *testing.T) {
 func TestMergePodSpec_WithPostgreSQL_and_JDBC_URL_field(t *testing.T) {
 	workflow := test.GetBaseSonataFlow(t.Name())
 	workflow.Spec = v1alpha08.SonataFlowSpec{
-		PodTemplate: v1alpha08.PodTemplateSpec{
+		PodTemplate: v1alpha08.FlowPodTemplateSpec{
 			Container: v1alpha08.ContainerSpec{
 				// this one we can override
 				Image: "quay.io/example/my-workflow:1.0.0",
 				Ports: []corev1.ContainerPort{
 					// let's override a immutable attribute
-					{Name: utils.HttpScheme, ContainerPort: 9090},
+					{Name: utils.DefaultServicePortName, ContainerPort: 9090},
 				},
 				Env: []corev1.EnvVar{
 					// We should be able to override this too
@@ -295,14 +295,6 @@ func TestMergePodSpec_WithPostgreSQL_and_JDBC_URL_field(t *testing.T) {
 			Name:  "KOGITO_PERSISTENCE_TYPE",
 			Value: "jdbc",
 		},
-		{
-			Name:  "KOGITO_PERSISTENCE_PROTO_MARSHALLER",
-			Value: "false",
-		},
-		{
-			Name:  "KOGITO_PERSISTENCE_QUERY_TIMEOUT_MILLIS",
-			Value: "10000",
-		},
 	}
 	assert.Len(t, deployment.Spec.Template.Spec.Containers, 2)
 	assert.Equal(t, "superuser", deployment.Spec.Template.Spec.ServiceAccountName)
@@ -321,7 +313,7 @@ var (
 func TestMergePodSpec_OverrideContainers_WithPostgreSQL_In_Workflow_CR(t *testing.T) {
 	workflow := test.GetBaseSonataFlow(t.Name())
 	workflow.Spec = v1alpha08.SonataFlowSpec{
-		PodTemplate: v1alpha08.PodTemplateSpec{
+		PodTemplate: v1alpha08.FlowPodTemplateSpec{
 			PodSpec: v1alpha08.PodSpec{
 				// Try to override the workflow container via the podspec
 				Containers: []corev1.Container{
@@ -329,7 +321,7 @@ func TestMergePodSpec_OverrideContainers_WithPostgreSQL_In_Workflow_CR(t *testin
 						Name:  v1alpha08.DefaultContainerName,
 						Image: "quay.io/example/my-workflow:1.0.0",
 						Ports: []corev1.ContainerPort{
-							{Name: utils.HttpScheme, ContainerPort: 9090},
+							{Name: utils.DefaultServicePortName, ContainerPort: 9090},
 						},
 						Env: []corev1.EnvVar{
 							{Name: "ENV1", Value: "VALUE_CUSTOM"},
@@ -386,14 +378,6 @@ func TestMergePodSpec_OverrideContainers_WithPostgreSQL_In_Workflow_CR(t *testin
 		{
 			Name:  "KOGITO_PERSISTENCE_TYPE",
 			Value: "jdbc",
-		},
-		{
-			Name:  "KOGITO_PERSISTENCE_PROTO_MARSHALLER",
-			Value: "false",
-		},
-		{
-			Name:  "KOGITO_PERSISTENCE_QUERY_TIMEOUT_MILLIS",
-			Value: "10000",
 		},
 	}
 	assert.Len(t, deployment.Spec.Template.Spec.Containers, 1)
@@ -467,14 +451,6 @@ func TestMergePodSpec_WithServicedPostgreSQL_In_Platform_CR_And_Worflow_Requesti
 			Name:  "KOGITO_PERSISTENCE_TYPE",
 			Value: "jdbc",
 		},
-		{
-			Name:  "KOGITO_PERSISTENCE_PROTO_MARSHALLER",
-			Value: "false",
-		},
-		{
-			Name:  "KOGITO_PERSISTENCE_QUERY_TIMEOUT_MILLIS",
-			Value: "10000",
-		},
 	}
 	assert.Len(t, deployment.Spec.Template.Spec.Containers, 1)
 	flowContainer, _ := kubeutil.GetContainerByName(v1alpha08.DefaultContainerName, &deployment.Spec.Template.Spec)
@@ -510,7 +486,7 @@ func TestMergePodSpec_WithServicedPostgreSQL_In_Platform_And_In_Workflow_CR(t *t
 	}
 	workflow := test.GetBaseSonataFlow(t.Name())
 	workflow.Spec = v1alpha08.SonataFlowSpec{
-		PodTemplate: v1alpha08.PodTemplateSpec{
+		PodTemplate: v1alpha08.FlowPodTemplateSpec{
 			PodSpec: v1alpha08.PodSpec{
 				// Try to override the workflow container via the podspec
 				Containers: []corev1.Container{
@@ -518,7 +494,7 @@ func TestMergePodSpec_WithServicedPostgreSQL_In_Platform_And_In_Workflow_CR(t *t
 						Name:  v1alpha08.DefaultContainerName,
 						Image: "quay.io/example/my-workflow:1.0.0",
 						Ports: []corev1.ContainerPort{
-							{Name: utils.HttpScheme, ContainerPort: 9090},
+							{Name: utils.DefaultServicePortName, ContainerPort: 9090},
 						},
 						Env: []corev1.EnvVar{
 							{Name: "ENV1", Value: "VALUE_CUSTOM"},
@@ -574,14 +550,6 @@ func TestMergePodSpec_WithServicedPostgreSQL_In_Platform_And_In_Workflow_CR(t *t
 		{
 			Name:  "KOGITO_PERSISTENCE_TYPE",
 			Value: "jdbc",
-		},
-		{
-			Name:  "KOGITO_PERSISTENCE_PROTO_MARSHALLER",
-			Value: "false",
-		},
-		{
-			Name:  "KOGITO_PERSISTENCE_QUERY_TIMEOUT_MILLIS",
-			Value: "10000",
 		},
 	}
 	assert.Len(t, deployment.Spec.Template.Spec.Containers, 1)
