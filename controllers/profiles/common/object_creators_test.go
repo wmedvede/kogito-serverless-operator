@@ -41,7 +41,7 @@ import (
 
 func Test_ensureWorkflowPropertiesConfigMapMutator(t *testing.T) {
 	workflow := test.GetBaseSonataFlowWithDevProfile(t.Name())
-	platform := test.GetBasePlatform()
+	platform := test.GetBasePlatformInReadyPhase(workflow.Namespace)
 	// can't be new
 	managedProps, _ := ManagedPropsConfigMapCreator(workflow, platform)
 	managedProps.SetUID("1")
@@ -50,7 +50,7 @@ func Test_ensureWorkflowPropertiesConfigMapMutator(t *testing.T) {
 
 	userProps, _ := UserPropsConfigMapCreator(workflow)
 	userPropsCM := userProps.(*corev1.ConfigMap)
-	visitor := ManagedPropertiesMutateVisitor(context.TODO(), nil, workflow, nil, userPropsCM)
+	visitor := ManagedPropertiesMutateVisitor(context.TODO(), nil, workflow, platform, userPropsCM)
 	mutateFn := visitor(managedProps)
 
 	assert.NoError(t, mutateFn())
@@ -74,7 +74,7 @@ func Test_ensureWorkflowPropertiesConfigMapMutator(t *testing.T) {
 
 func Test_ensureWorkflowPropertiesConfigMapMutator_DollarReplacement(t *testing.T) {
 	workflow := test.GetBaseSonataFlowWithDevProfile(t.Name())
-	platform := test.GetBasePlatform()
+	platform := test.GetBasePlatformInReadyPhase(workflow.Namespace)
 	managedProps, _ := ManagedPropsConfigMapCreator(workflow, platform)
 	managedProps.SetName(workflow.Name)
 	managedProps.SetNamespace(workflow.Namespace)
@@ -85,7 +85,7 @@ func Test_ensureWorkflowPropertiesConfigMapMutator_DollarReplacement(t *testing.
 	userPropsCM := userProps.(*corev1.ConfigMap)
 	userPropsCM.Data[workflowproj.ApplicationPropertiesFileName] = "mp.messaging.outgoing.kogito_outgoing_stream.url=${kubernetes:services.v1/event-listener}"
 
-	mutateVisitorFn := ManagedPropertiesMutateVisitor(context.TODO(), nil, workflow, nil, userPropsCM)
+	mutateVisitorFn := ManagedPropertiesMutateVisitor(context.TODO(), nil, workflow, platform, userPropsCM)
 
 	err := mutateVisitorFn(managedPropsCM)()
 	assert.NoError(t, err)
