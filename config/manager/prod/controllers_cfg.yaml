@@ -29,10 +29,10 @@ builderConfigMapName: "logic-operator-rhel8-builder-config"
 # Quarkus extensions required for workflows persistence. These extensions are used by the SonataFlow build system,
 # in cases where the workflow being built has configured postgresql persistence.
 postgreSQLPersistenceExtensions:
-  - groupId: com.redhat.quarkus.platform
+  - groupId: io.quarkus
     artifactId: quarkus-jdbc-postgresql
     version: 3.8.4.redhat-00002
-  - groupId: com.redhat.quarkus.platform
+  - groupId: io.quarkus
     artifactId: quarkus-agroal
     version: 3.8.4.redhat-00002
   - groupId: org.kie
