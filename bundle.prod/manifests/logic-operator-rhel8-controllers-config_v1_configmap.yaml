@@ -15,7 +15,7 @@ data:
     jobsServiceEphemeralImageTag: "registry.redhat.io/openshift-serverless-1/logic-jobs-service-ephemeral-rhel8:1.33.0"
     # The Data Index image to use, if empty the operator will use the default Apache Community one based on the current operator's version
     dataIndexPostgreSQLImageTag: "registry.redhat.io/openshift-serverless-1/logic-data-index-postgresql-rhel8:1.33.0"
-    dataIndexEphemeralTag: "registry.redhat.io/openshift-serverless-1/logic-data-index-ephemeral-rhel8:1.33.0"
+    dataIndexEphemeralImageTag: "registry.redhat.io/openshift-serverless-1/logic-data-index-ephemeral-rhel8:1.33.0"
     # SonataFlow base builder image used in the internal Dockerfile to build workflow applications in preview profile
     # Order of precedence is:
     # 1. SonataFlowPlatform in the given namespace
