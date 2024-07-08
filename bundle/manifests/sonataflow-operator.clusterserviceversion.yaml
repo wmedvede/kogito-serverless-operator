@@ -119,7 +119,7 @@ metadata:
       ]
     capabilities: Basic Install
     categories: Application Runtime
-    containerImage: quay.io/kiegroup/kogito-serverless-operator-nightly:latest
+    containerImage: docker.io/apache/incubator-kie-sonataflow-operator:main
     description: SonataFlow Kubernetes Operator for deploying workflow applications
       based on the CNCF Serverless Workflow specification
     operators.operatorframework.io/builder: operator-sdk-v1.25.0
@@ -135,7 +135,7 @@ spec:
     owned:
     - description: SonataFlowBuild is an internal custom resource to control workflow
         build instances in the target platform
-      displayName: Sonata Flow Build
+      displayName: SonataFlowBuild
       kind: SonataFlowBuild
       name: sonataflowbuilds.sonataflow.org
       resources:
@@ -182,7 +182,7 @@ spec:
       version: v1alpha08
     - description: SonataFlowClusterPlatform is the Schema for the sonataflowclusterplatforms
         API
-      displayName: Sonata Flow Cluster Platform
+      displayName: SonataFlowClusterPlatform
       kind: SonataFlowClusterPlatform
       name: sonataflowclusterplatforms.sonataflow.org
       resources:
@@ -211,7 +211,7 @@ spec:
       version: v1alpha08
     - description: SonataFlowPlatform is the descriptor for the workflow platform
         infrastructure.
-      displayName: Sonata Flow Platform
+      displayName: SonataFlowPlatform
       kind: SonataFlowPlatform
       name: sonataflowplatforms.sonataflow.org
       resources:
@@ -281,7 +281,7 @@ spec:
       version: v1alpha08
     - description: SonataFlow is the descriptor representation for a workflow application
         based on the CNCF Serverless Workflow specification.
-      displayName: Sonata Flow
+      displayName: SonataFlow
       kind: SonataFlow
       name: sonataflows.sonataflow.org
       resources:
@@ -328,6 +328,9 @@ spec:
         path: endpoint
       - displayName: lastTimeRecoverAttempt
         path: lastTimeRecoverAttempt
+      - description: Platform displays which platform is being used by this workflow
+        displayName: platform
+        path: platform
       - description: keeps track of how many failure recovers a given workflow had
           so far
         displayName: recoverFailureAttempts
@@ -758,7 +761,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                image: quay.io/kiegroup/kogito-serverless-operator-nightly:latest
+                image: docker.io/apache/incubator-kie-sonataflow-operator:latest
                 livenessProbe:
                   httpGet:
                     path: /healthz
