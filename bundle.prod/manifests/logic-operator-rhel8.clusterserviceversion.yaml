@@ -770,7 +770,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                image: registry.redhat.io/openshift-serverless-1/logic-rhel8-operator@sha256:717da9df5809ac2094ddeaff9d237b273bd0c6fec5e548f9a8a7de27370e741e
+                image: registry.redhat.io/openshift-serverless-1/logic-rhel8-operator@sha256:ce5559fd8f19280d1c54dff5390449130c22af6b896d7cc96d8895d49d548d16
                 livenessProbe:
                   httpGet:
                     path: /healthz
