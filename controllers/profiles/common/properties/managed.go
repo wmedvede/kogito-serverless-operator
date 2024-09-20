@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/controllers/profiles/common/persistence"
 
 	"github.com/apache/incubator-kie-kogito-serverless-operator/utils"
@@ -148,6 +149,9 @@ func NewManagedPropertyHandler(workflow *operatorapi.SonataFlow, platform *opera
 		platform: platform,
 	}
 	props := properties.NewProperties()
+	if profiles.IsDevProfile(workflow) {
+		setDevProfileProperties(props)
+	}
 	props.Set(constants.KogitoUserTasksEventsEnabled, "false")
 	if platform != nil {
 		p, err := resolvePlatformWorkflowProperties(platform)
@@ -181,6 +185,10 @@ func NewManagedPropertyHandler(workflow *operatorapi.SonataFlow, platform *opera
 
 	handler.defaultManagedProperties = props
 	return handler.withKogitoServiceUrl(), nil
+}
+
+func setDevProfileProperties(props *properties.Properties) {
+	props.Set(fmt.Sprintf("%%dev.%s", constants.QuarkusDevUICorsEnabled), "false")
 }
 
 // ApplicationManagedProperties immutable default application properties that can be used with any workflow based on Quarkus.
