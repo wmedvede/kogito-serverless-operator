@@ -61,38 +61,38 @@ func (action *serviceAction) CanHandle(platform *operatorapi.SonataFlowPlatform)
 	return platform.Status.IsReady()
 }
 
-func (action *serviceAction) Handle(ctx context.Context, platform *operatorapi.SonataFlowPlatform) (*operatorapi.SonataFlowPlatform, error) {
+func (action *serviceAction) Handle(ctx context.Context, platform *operatorapi.SonataFlowPlatform) (*operatorapi.SonataFlowPlatform, *corev1.Event, error) {
 	// Refresh applied configuration
 	if err := CreateOrUpdateWithDefaults(ctx, platform, false); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	psDI := services.NewDataIndexHandler(platform)
 	if psDI.IsServiceSetInSpec() {
-		if err := createOrUpdateServiceComponents(ctx, action.client, platform, psDI); err != nil {
-			return nil, err
+		if event, err := createOrUpdateServiceComponents(ctx, action.client, platform, psDI); err != nil {
+			return nil, event, err
 		}
 	}
 
 	psJS := services.NewJobServiceHandler(platform)
 	if psJS.IsServiceSetInSpec() {
-		if err := createOrUpdateServiceComponents(ctx, action.client, platform, psJS); err != nil {
-			return nil, err
+		if event, err := createOrUpdateServiceComponents(ctx, action.client, platform, psJS); err != nil {
+			return nil, event, err
 		}
 	}
 
-	return platform, nil
+	return platform, nil, nil
 }
 
-func createOrUpdateServiceComponents(ctx context.Context, client client.Client, platform *operatorapi.SonataFlowPlatform, psh services.PlatformServiceHandler) error {
+func createOrUpdateServiceComponents(ctx context.Context, client client.Client, platform *operatorapi.SonataFlowPlatform, psh services.PlatformServiceHandler) (*corev1.Event, error) {
 	if err := createOrUpdateConfigMap(ctx, client, platform, psh); err != nil {
-		return err
+		return nil, err
 	}
 	if err := createOrUpdateDeployment(ctx, client, platform, psh); err != nil {
-		return err
+		return nil, err
 	}
 	if err := createOrUpdateService(ctx, client, platform, psh); err != nil {
-		return err
+		return nil, err
 	}
 	return createOrUpdateKnativeResources(ctx, client, platform, psh)
 }
@@ -159,6 +159,7 @@ func createOrUpdateDeployment(ctx context.Context, client client.Client, platfor
 			MatchLabels: selectorLbl,
 		},
 		Replicas: &replicas,
+		Strategy: psh.GetDeploymentStrategy(),
 		Template: corev1.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: lbl,
@@ -200,6 +201,9 @@ func createOrUpdateDeployment(ctx context.Context, client client.Client, platfor
 	if op, err := controllerutil.CreateOrUpdate(ctx, client, serviceDeployment, func() error {
 		knative.SaveKnativeData(&serviceDeploymentSpec.Template.Spec, &serviceDeployment.Spec.Template.Spec)
 		err := mergo.Merge(&(serviceDeployment.Spec), serviceDeploymentSpec, mergo.WithOverride)
+		// mergo.Merge algorithm is not setting the serviceDeployment.Spec.Replicas when the
+		// *serviceDeploymentSpec.Replicas is 0. Making impossible to scale to zero. Ensure the value.
+		serviceDeployment.Spec.Replicas = serviceDeploymentSpec.Replicas
 		if err != nil {
 			return err
 		}
@@ -307,24 +311,24 @@ func setSonataFlowPlatformFinalizer(ctx context.Context, c client.Client, platfo
 	return nil
 }
 
-func createOrUpdateKnativeResources(ctx context.Context, client client.Client, platform *operatorapi.SonataFlowPlatform, psh services.PlatformServiceHandler) error {
+func createOrUpdateKnativeResources(ctx context.Context, client client.Client, platform *operatorapi.SonataFlowPlatform, psh services.PlatformServiceHandler) (*corev1.Event, error) {
 	lbl, _ := getLabels(platform, psh)
-	objs, err := psh.GenerateKnativeResources(platform, lbl)
+	objs, event, err := psh.GenerateKnativeResources(platform, lbl)
 	if err != nil {
-		return err
+		return event, err
 	}
 	// Create or update triggers
 	for _, obj := range objs {
 		if triggerDef, ok := obj.(*eventingv1.Trigger); ok {
 			if platform.Namespace == obj.GetNamespace() {
 				if err := controllerutil.SetControllerReference(platform, obj, client.Scheme()); err != nil {
-					return err
+					return nil, err
 				}
 			} else {
 				// This is for Knative trigger in a different namespace
 				// Set the finalizer for trigger cleanup when the platform is deleted
 				if err := setSonataFlowPlatformFinalizer(ctx, client, platform); err != nil {
-					return err
+					return nil, err
 				}
 			}
 			trigger := &eventingv1.Trigger{
@@ -335,21 +339,21 @@ func createOrUpdateKnativeResources(ctx context.Context, client client.Client, p
 				return nil
 			})
 			if err != nil {
-				return err
+				return nil, err
 			}
 			addToSonataFlowPlatformTriggerList(platform, trigger)
 		}
 	}
 
 	if err := SafeUpdatePlatformStatus(ctx, platform); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Create or update sinkbindings
 	for _, obj := range objs {
 		if sbDef, ok := obj.(*sourcesv1.SinkBinding); ok {
 			if err := controllerutil.SetControllerReference(platform, obj, client.Scheme()); err != nil {
-				return err
+				return nil, err
 			}
 			sinkBinding := &sourcesv1.SinkBinding{
 				ObjectMeta: sbDef.ObjectMeta,
@@ -359,18 +363,24 @@ func createOrUpdateKnativeResources(ctx context.Context, client client.Client, p
 				return nil
 			})
 			if err != nil {
-				return err
+				return nil, err
 			}
 			kSinkInjected, err := psh.CheckKSinkInjected()
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if !kSinkInjected {
-				return fmt.Errorf("waiting for K_SINK injection for %s to complete", psh.GetServiceName())
+				msg := fmt.Sprintf("waiting for K_SINK injection for service %s to complete", psh.GetServiceName())
+				event := &corev1.Event{
+					Type:    corev1.EventTypeWarning,
+					Reason:  services.WaitingKnativeEventing,
+					Message: msg,
+				}
+				return event, fmt.Errorf(msg)
 			}
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 func addToSonataFlowPlatformTriggerList(platform *operatorapi.SonataFlowPlatform, trigger *eventingv1.Trigger) {
