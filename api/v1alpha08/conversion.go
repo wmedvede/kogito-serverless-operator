@@ -60,6 +60,9 @@ func FromCNCFWorkflow(cncfWorkflow *cncfmodel.Workflow, context context.Context)
 			},
 		},
 	}
+	if len(cncfWorkflow.Name) > 0 {
+		workflowCR.ObjectMeta.Annotations[metadata.Name] = cncfWorkflow.Name
+	}
 	workflowBytes, err := yaml.Marshal(cncfWorkflow)
 	if err != nil {
 		return nil, err
@@ -107,6 +110,13 @@ func ToCNCFWorkflow(workflowCR *SonataFlow, context context.Context) (*cncfmodel
 	cncfWorkflow.Version = workflowCR.ObjectMeta.Annotations[metadata.Version]
 	cncfWorkflow.SpecVersion = extractSpecVersion(workflowCR)
 	cncfWorkflow.ExpressionLang = cncfmodel.ExpressionLangType(extractExpressionLang(workflowCR.ObjectMeta.Annotations))
+
+	name := workflowCR.ObjectMeta.Annotations[metadata.Name]
+	if len(name) > 0 {
+		cncfWorkflow.Name = name
+	} else {
+		cncfWorkflow.Name = workflowCR.ObjectMeta.Name
+	}
 
 	warnIfSpecVersionNotSupported(cncfWorkflow, context)
 
