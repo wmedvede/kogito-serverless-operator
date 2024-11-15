@@ -120,6 +120,7 @@ metadata:
     capabilities: Basic Install
     categories: Application Runtime
     certified: "false"
+    createdAt: "2024-11-15T16:05:39Z"
     description: OpenShift Serverless Logic Kubernetes Operator for deploying workflow
       applications based on the CNCF Serverless Workflow specification
     features.operators.openshift.io/disconnected: "false"
@@ -132,9 +133,9 @@ metadata:
     operatorframework.io/suggested-namespace: openshift-serverless-logic
     operators.openshift.io/valid-subscription: '["OpenShift Container Platform", "OpenShift
       Platform Plus"]'
-    operators.operatorframework.io/builder: operator-sdk-v1.25.0
+    operators.operatorframework.io/builder: operator-sdk-v1.35.0
     operators.operatorframework.io/internal-objects: '["sonataflowbuilds.sonataflow.org"]'
-    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://github.com/kiegroup/kogito-serverless-operator/
     support: Red Hat
   name: logic-operator-rhel8.v1.35.0
@@ -145,7 +146,7 @@ spec:
     owned:
     - description: SonataFlowBuild is an internal custom resource to control workflow
         build instances in the target platform
-      displayName: Sonata Flow Build
+      displayName: SonataFlowBuild
       kind: SonataFlowBuild
       name: sonataflowbuilds.sonataflow.org
       resources:
@@ -192,7 +193,7 @@ spec:
       version: v1alpha08
     - description: SonataFlowClusterPlatform is the Schema for the sonataflowclusterplatforms
         API
-      displayName: Sonata Flow Cluster Platform
+      displayName: SonataFlowClusterPlatform
       kind: SonataFlowClusterPlatform
       name: sonataflowclusterplatforms.sonataflow.org
       resources:
@@ -221,7 +222,7 @@ spec:
       version: v1alpha08
     - description: SonataFlowPlatform is the descriptor for the workflow platform
         infrastructure.
-      displayName: Sonata Flow Platform
+      displayName: SonataFlowPlatform
       kind: SonataFlowPlatform
       name: sonataflowplatforms.sonataflow.org
       resources:
@@ -258,6 +259,11 @@ spec:
           no build required)
         displayName: DevMode
         path: devMode
+      - description: Broker to communicate with workflow deployment.  It can be the
+          default broker when the workflow, Dataindex, or Jobservice does not have
+          a sink or source specified.
+        displayName: broker
+        path: eventing.broker
       - description: 'Services attributes for deploying supporting applications like
           Data Index & Job Service. Only workflows without the `sonataflow.org/profile:
           dev` annotation will be configured to use these service(s). Setting this
@@ -282,16 +288,19 @@ spec:
           SonataFlowClusterPlatform
         displayName: clusterPlatformRef
         path: clusterPlatformRef
-      - description: Info generic information related to the build
+      - description: Info generic information related to the Platform
         displayName: info
         path: info
+      - description: Triggers list of triggers created for the SonataFlowPlatform
+        displayName: triggers
+        path: triggers
       - description: Version the operator version controlling this Platform
         displayName: version
         path: version
       version: v1alpha08
     - description: SonataFlow is the descriptor representation for a workflow application
         based on the CNCF Serverless Workflow specification.
-      displayName: Sonata Flow
+      displayName: SonataFlow
       kind: SonataFlow
       name: sonataflows.sonataflow.org
       resources:
@@ -328,6 +337,10 @@ spec:
       - description: Sink describes the sinkBinding details of this SonataFlow instance.
         displayName: sink
         path: sink
+      - description: Sources describes the list of sources used to create triggers
+          for events consumed by this SonataFlow instance.
+        displayName: sources
+        path: sources
       statusDescriptors:
       - description: Address is used as a part of Addressable interface (status.address.url)
           for knative
@@ -336,8 +349,13 @@ spec:
       - description: Endpoint is an externally accessible URL of the workflow
         displayName: endpoint
         path: endpoint
+      - displayName: flowRevision
+        path: flowCRC
       - displayName: lastTimeRecoverAttempt
         path: lastTimeRecoverAttempt
+      - description: Platform displays which platform is being used by this workflow
+        displayName: platform
+        path: platform
       - description: keeps track of how many failure recovers a given workflow had
           so far
         displayName: recoverFailureAttempts
@@ -346,6 +364,9 @@ spec:
           workflow
         displayName: services
         path: services
+      - description: Triggers list of triggers created for the SonataFlow
+        displayName: triggers
+        path: triggers
       version: v1alpha08
   description: |-
     OpenShift Serverless Logic Kubernetes Operator for deploying workflow applications
@@ -480,86 +501,30 @@ spec:
           - update
           - watch
         - apiGroups:
+          - monitoring.coreos.com
+          resources:
+          - servicemonitors
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - update
+          - watch
+        - apiGroups:
+          - serving.knative.dev
+          resources:
+          - revisions
+          verbs:
+          - delete
+          - list
+          - watch
+        - apiGroups:
           - sonataflow.org
           resources:
           - sonataflowbuilds
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - sonataflow.org
-          resources:
-          - sonataflowbuilds/finalizers
-          verbs:
-          - update
-        - apiGroups:
-          - sonataflow.org
-          resources:
-          - sonataflowbuilds/status
-          verbs:
-          - get
-          - patch
-          - update
-        - apiGroups:
-          - sonataflow.org
-          resources:
           - sonataflowclusterplatforms
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - sonataflow.org
-          resources:
-          - sonataflowclusterplatforms/finalizers
-          verbs:
-          - update
-        - apiGroups:
-          - sonataflow.org
-          resources:
-          - sonataflowclusterplatforms/status
-          verbs:
-          - get
-          - patch
-          - update
-        - apiGroups:
-          - sonataflow.org
-          resources:
           - sonataflowplatforms
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
-          - sonataflow.org
-          resources:
-          - sonataflowplatforms/finalizers
-          verbs:
-          - update
-        - apiGroups:
-          - sonataflow.org
-          resources:
-          - sonataflowplatforms/status
-          verbs:
-          - get
-          - patch
-          - update
-        - apiGroups:
-          - sonataflow.org
-          resources:
           - sonataflows
           verbs:
           - create
@@ -572,12 +537,18 @@ spec:
         - apiGroups:
           - sonataflow.org
           resources:
+          - sonataflowbuilds/finalizers
+          - sonataflowclusterplatforms/finalizers
+          - sonataflowplatforms/finalizers
           - sonataflows/finalizers
           verbs:
           - update
         - apiGroups:
           - sonataflow.org
           resources:
+          - sonataflowbuilds/status
+          - sonataflowclusterplatforms/status
+          - sonataflowplatforms/status
           - sonataflows/status
           verbs:
           - get
@@ -767,7 +738,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                image: registry.redhat.io/openshift-serverless-1/logic-rhel8-operator@sha256:123456789
+                image: registry.redhat.io/openshift-serverless-1/logic-rhel8-operator@sha256:8d16a903b5b5307f3636a82bce59efaebac3789d63558c8e0bca860a88e89b60
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -784,10 +755,10 @@ spec:
                 resources:
                   limits:
                     cpu: 500m
-                    memory: 128Mi
+                    memory: 500Mi
                   requests:
-                    cpu: 10m
-                    memory: 64Mi
+                    cpu: 100m
+                    memory: 200Mi
                 securityContext:
                   allowPrivilegeEscalation: false
                   capabilities:
