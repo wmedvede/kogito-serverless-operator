@@ -919,7 +919,6 @@ func TestSonataFlowPlatformController(t *testing.T) {
 		validateTrigger(t, cl, "data-index-process-definition-", ksp.Namespace, ksp, trigger)
 		validateTrigger(t, cl, "data-index-process-error-", ksp.Namespace, ksp, trigger)
 		validateTrigger(t, cl, "data-index-process-node-", ksp.Namespace, ksp, trigger)
-		validateTrigger(t, cl, "data-index-process-sla-", ksp.Namespace, ksp, trigger)
 		validateTrigger(t, cl, "data-index-process-state-", ksp.Namespace, ksp, trigger)
 		validateTrigger(t, cl, "data-index-process-variable-", ksp.Namespace, ksp, trigger)
 
@@ -1032,8 +1031,6 @@ func TestSonataFlowPlatformController(t *testing.T) {
 		validateTrigger(t, cl, "data-index-process-error-", ksp.Namespace, ksp, trigger)
 		assert.Equal(t, trigger.Spec.Broker, brokerNameDataIndexSource)
 		validateTrigger(t, cl, "data-index-process-node-", ksp.Namespace, ksp, trigger)
-		assert.Equal(t, trigger.Spec.Broker, brokerNameDataIndexSource)
-		validateTrigger(t, cl, "data-index-process-sla-", ksp.Namespace, ksp, trigger)
 		assert.Equal(t, trigger.Spec.Broker, brokerNameDataIndexSource)
 		validateTrigger(t, cl, "data-index-process-state-", ksp.Namespace, ksp, trigger)
 		assert.Equal(t, trigger.Spec.Broker, brokerNameDataIndexSource)
