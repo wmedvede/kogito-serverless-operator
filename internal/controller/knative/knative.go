@@ -22,6 +22,7 @@ package knative
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	operatorapi "github.com/apache/incubator-kie-kogito-serverless-operator/api/v1alpha08"
 	"github.com/apache/incubator-kie-kogito-serverless-operator/utils"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
+	"knative.dev/eventing/pkg/apis/eventing"
 	eventingv1 "knative.dev/eventing/pkg/apis/eventing/v1"
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 	clienteventingv1 "knative.dev/eventing/pkg/client/clientset/versioned/typed/eventing/v1"
@@ -50,14 +52,16 @@ type Availability struct {
 }
 
 const (
-	kSink                     = "K_SINK"
-	knativeBundleVolume       = "kne-bundle-volume"
-	kCeOverRides              = "K_CE_OVERRIDES"
-	knativeServingGroup       = "serving.knative.dev"
-	knativeEventingGroup      = "eventing.knative.dev"
-	knativeEventingAPIVersion = "eventing.knative.dev/v1"
-	knativeBrokerKind         = "Broker"
-	knativeSinkProvided       = "SinkProvided"
+	kSink                                    = "K_SINK"
+	knativeBundleVolume                      = "kne-bundle-volume"
+	kCeOverRides                             = "K_CE_OVERRIDES"
+	knativeServingGroup                      = "serving.knative.dev"
+	knativeEventingGroup                     = "eventing.knative.dev"
+	knativeEventingAPIVersion                = "eventing.knative.dev/v1"
+	knativeBrokerKind                        = "Broker"
+	knativeSinkProvided                      = "SinkProvided"
+	KafkaKnativeEventingDeliveryOrder        = "kafka.eventing.knative.dev/delivery.order"
+	KafkaKnativeEventingDeliveryOrderOrdered = "ordered"
 )
 
 func GetKnativeServingClient(cfg *rest.Config) (clientservingv1.ServingV1Interface, error) {
@@ -131,19 +135,33 @@ func getDestinationWithNamespace(dest *duckv1.Destination, namespace string) *du
 	return dest
 }
 
-func ValidateBroker(name, namespace string) error {
+func ValidateBroker(name, namespace string) (*eventingv1.Broker, error) {
 	broker := &eventingv1.Broker{}
 	if err := utils.GetClient().Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, broker); err != nil {
 		if errors.IsNotFound(err) {
-			return fmt.Errorf("broker %s in namespace %s does not exist", name, namespace)
+			return nil, fmt.Errorf("broker %s in namespace %s does not exist", name, namespace)
 		}
-		return err
+		return nil, err
 	}
 	cond := broker.Status.GetCondition(apis.ConditionReady)
 	if cond != nil && cond.Status == corev1.ConditionTrue {
-		return nil
+		return broker, nil
 	}
-	return fmt.Errorf("broker %s in namespace %s is not ready", name, namespace)
+	return nil, fmt.Errorf("broker %s in namespace %s is not ready", name, namespace)
+}
+
+// GetBrokerClass returns the broker class for a Knative Eventing Broker.
+func GetBrokerClass(broker *eventingv1.Broker) string {
+	if broker.Annotations == nil {
+		return ""
+	}
+	return broker.Annotations[eventing.BrokerClassKey]
+}
+
+// IsKafkaBroker returns true if the class for a Knative Eventing Broker corresponds to a Kafka broker.
+func IsKafkaBroker(brokerClass string) bool {
+	// currently available kafka broker classes are "Kafka", and "KafkaNamespaced", for safety ask for the substring "Kafka".
+	return strings.Contains(brokerClass, "Kafka")
 }
 
 func GetWorkflowSink(workflow *operatorapi.SonataFlow, pl *operatorapi.SonataFlowPlatform) (*duckv1.Destination, error) {
