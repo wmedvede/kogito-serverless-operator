@@ -30,7 +30,7 @@
         image_build_method: imagebuilder
         remote_source:
           repo: https://github.com/kiegroup/kogito-serverless-operator
-          ref: 7436a86786f8eea51cd541a141213fc89c100697
+          ref: 1489944eaabb300a17adb9dcf005f4b720dda8a7
           pkg_managers:
             - gomod
         platforms:
