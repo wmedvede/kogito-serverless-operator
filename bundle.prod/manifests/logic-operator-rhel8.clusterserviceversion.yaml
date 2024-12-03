@@ -120,7 +120,7 @@ metadata:
     capabilities: Basic Install
     categories: Application Runtime
     certified: "false"
-    createdAt: "2024-11-15T16:05:39Z"
+    createdAt: "2024-12-03T19:00:48Z"
     description: OpenShift Serverless Logic Kubernetes Operator for deploying workflow
       applications based on the CNCF Serverless Workflow specification
     features.operators.openshift.io/disconnected: "false"
@@ -738,7 +738,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                image: registry.redhat.io/openshift-serverless-1/logic-rhel8-operator@sha256:8d16a903b5b5307f3636a82bce59efaebac3789d63558c8e0bca860a88e89b60
+                image: registry.redhat.io/openshift-serverless-1/logic-rhel8-operator@sha256:219196a5b96e16042600be55a0ef09714afa2435cc93f428999532f0ebb16555
                 livenessProbe:
                   httpGet:
                     path: /healthz
